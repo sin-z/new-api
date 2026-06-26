@@ -23,11 +23,17 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type EmailLoginRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
 }
 
 func Login(c *gin.Context) {
@@ -99,6 +105,8 @@ func loginMethodFromContext(c *gin.Context) string {
 		return "2fa"
 	case "/api/user/passkey/login/finish":
 		return "passkey"
+	case "/api/user/email_login":
+		return "email_code"
 	case "/api/oauth/wechat":
 		return "wechat"
 	case "/api/oauth/telegram/login":
@@ -154,6 +162,112 @@ func setupLogin(user *model.User, c *gin.Context) {
 			"group":        user.Group,
 		},
 	})
+}
+
+func validateEmailLoginAddress(c *gin.Context, email string) bool {
+	if err := common.Validate.Var(email, "required,email"); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return false
+	}
+
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return false
+	}
+
+	localPart := parts[0]
+	domainPart := parts[1]
+	if common.EmailDomainRestrictionEnabled {
+		allowed := false
+		for _, domain := range common.EmailDomainWhitelist {
+			if domainPart == domain {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return false
+		}
+	}
+
+	if common.EmailAliasRestrictionEnabled && (strings.Contains(localPart, "+") || strings.Contains(localPart, ".")) {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return false
+	}
+
+	return true
+}
+
+func findEnabledUserByEmail(c *gin.Context, email string) (*model.User, bool) {
+	var user model.User
+	if err := model.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			common.ApiErrorI18n(c, i18n.MsgUserEmailLoginUserNotFound)
+			return nil, false
+		}
+		common.SysLog(fmt.Sprintf("Email login database error for email %s: %v", email, err))
+		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
+		return nil, false
+	}
+	if user.Status != common.UserStatusEnabled {
+		common.ApiErrorI18n(c, i18n.MsgUserDisabled)
+		return nil, false
+	}
+	return &user, true
+}
+
+func SendEmailLoginCode(c *gin.Context) {
+	email := strings.TrimSpace(c.Query("email"))
+	if !validateEmailLoginAddress(c, email) {
+		return
+	}
+	if _, ok := findEnabledUserByEmail(c, email); !ok {
+		return
+	}
+
+	code := common.GenerateVerificationCode(6)
+	common.RegisterVerificationCodeWithKey(email, code, common.EmailLoginPurpose)
+	subject := fmt.Sprintf("%s邮箱登录验证码", common.SystemName)
+	content := fmt.Sprintf("<p>您好，你正在登录%s。</p>"+
+		"<p>您的验证码为: <strong>%s</strong></p>"+
+		"<p>验证码 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, code, common.VerificationValidMinutes)
+	if err := common.SendEmail(subject, email, content); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
+}
+
+func EmailLogin(c *gin.Context) {
+	var req EmailLoginRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+
+	email := strings.TrimSpace(req.Email)
+	code := strings.TrimSpace(req.Code)
+	if email == "" || code == "" {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if !common.VerifyCodeWithKey(email, code, common.EmailLoginPurpose) {
+		common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
+		return
+	}
+
+	user, ok := findEnabledUserByEmail(c, email)
+	if !ok {
+		return
+	}
+	common.DeleteKey(email, common.EmailLoginPurpose)
+	setupLogin(user, c)
 }
 
 func Logout(c *gin.Context) {

@@ -81,6 +81,7 @@ const (
 	MsgUserEmailOrPasswordEmpty      = "user.email_or_password_empty"
 	MsgUserExists                    = "user.exists"
 	MsgUserNotExists                 = "user.not_exists"
+	MsgUserEmailLoginUserNotFound    = "user.email_login_user_not_found"
 	MsgUserDisabled                  = "user.disabled"
 	MsgUserSessionSaveFailed         = "user.session_save_failed"
 	MsgUserRequire2FA                = "user.require_2fa"
