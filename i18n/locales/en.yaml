@@ -69,6 +69,7 @@ user.username_or_password_error: "Username or password is incorrect, or user has
 user.email_or_password_empty: "Email or password is empty!"
 user.exists: "Username already exists or has been deleted"
 user.not_exists: "User does not exist"
+user.email_login_user_not_found: "No active user exists for this email address"
 user.disabled: "This user has been disabled"
 user.session_save_failed: "Failed to save session, please try again"
 user.require_2fa: "Please enter two-factor authentication code"
