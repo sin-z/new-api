@@ -175,6 +175,11 @@ export const CHANNEL_OPTIONS = [
     label: '豆包视频',
   },
   {
+    value: 101,
+    color: 'blue',
+    label: 'XRTokenArkVideo',
+  },
+  {
     value: 55,
     color: 'green',
     label: 'Sora',

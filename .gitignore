@@ -23,6 +23,8 @@ tiktoken_cache
 .gomodcache/
 .cache
 plans
+!docs/plans/
+!docs/plans/2026-06-28_XRTokenArkVideo薄TaskAdaptor.md
 .claude
 .cursor
 
