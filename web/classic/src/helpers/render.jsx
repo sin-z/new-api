@@ -403,6 +403,7 @@ export function getChannelIcon(channelType) {
       return <Jimeng.Color size={iconSize} />;
     case 54: // 豆包视频 Doubao Video
     case 101: // XRTokenArkVideo
+    case 102: // service-inference.ai
       return <Doubao.Color size={iconSize} />;
     case 56: // Replicate
       return <Replicate size={iconSize} />;

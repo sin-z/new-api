@@ -17,3 +17,15 @@ func TestChannelGetBaseURLUsesXRTokenDefault(t *testing.T) {
 		t.Fatalf("GetBaseURL() = %q, want XRToken default", got)
 	}
 }
+
+func TestChannelGetBaseURLUsesServiceInferenceDefault(t *testing.T) {
+	t.Parallel()
+
+	channel := &Channel{Type: constant.ChannelTypeServiceInferenceVideo}
+	emptyBaseURL := ""
+	channel.BaseURL = &emptyBaseURL
+
+	if got := channel.GetBaseURL(); got != "https://model.service-inference.ai" {
+		t.Fatalf("GetBaseURL() = %q, want service-inference.ai default", got)
+	}
+}

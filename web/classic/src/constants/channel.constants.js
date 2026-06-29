@@ -180,6 +180,11 @@ export const CHANNEL_OPTIONS = [
     label: 'XRTokenArkVideo',
   },
   {
+    value: 102,
+    color: 'blue',
+    label: 'service-inference.ai',
+  },
+  {
     value: 55,
     color: 'green',
     label: 'Sora',

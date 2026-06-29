@@ -1,5 +1,15 @@
 # Changes
 
+## 2026-06-29
+
+- 新增 service-inference.ai 视频 task adaptor：ChannelType 为 `102`，`ChannelTypeDummy` 后移到 `103`，默认 BaseURL 为 `https://model.service-inference.ai`。
+- 新增 `relay/channel/task/serviceinferencevideo` 包，复用 Doubao Seedance 请求体和计费估算；创建任务调用 `/v1/video/generate`，轮询只调用 `/v1/video/tasks/{taskId}`，不实现 list 兜底。
+- service-inference.ai 创建响应按 `{task:{id,...}}` 解析并保存上游 task id；查询响应按 `task.status` 映射统一任务状态，成功时取 `outputs[0]` 为主结果 URL，完整原始响应继续由任务轮询数据保留。
+- OpenAI Video 查询外壳继续使用 public task id 和 origin model；`duration_seconds`、`created_at`、`completed_at`、usage、失败 error 已适配，`last_frame_url` 不新增到 OpenAI Video 外壳。
+- 同步 default / classic 两套后台渠道入口，新增 `service-inference.ai` 渠道类型、展示顺序和 Doubao 图标映射；default locale 本次不补。
+- 新增测试覆盖 ChannelType / BaseURL / adaptor 分发、create / fetch URL、创建响应、状态映射、outputs、OpenAI Video 转换、后台入口文件内容、`ChannelTypeDummy` 上界和普通 channel test unsupported 列表。
+- 未新增用户侧 service-inference.ai 公开路由，未修改 `docs/api_contract.md` / OpenAPI。
+
 ## 2026-06-28
 
 - 新增 XRTokenArkVideo 薄 task adaptor 计划与技术方案，并已进入 Phase 2/3 实现回改。
