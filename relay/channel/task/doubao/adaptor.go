@@ -224,14 +224,55 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
+	if c.GetBool("seedance_native_response") {
+		c.JSON(http.StatusOK, gin.H{"id": info.PublicTaskID})
+		taskData, err = buildSeedanceNativeCreateTaskData(c, info)
+		if err != nil {
+			taskErr = service.TaskErrorWrapper(err, "build_seedance_native_task_data_failed", http.StatusInternalServerError)
+			return
+		}
+		return dResp.ID, taskData, nil
+	}
+
 	ov := dto.NewOpenAIVideo()
 	ov.ID = info.PublicTaskID
 	ov.TaskID = info.PublicTaskID
 	ov.CreatedAt = time.Now().Unix()
 	ov.Model = info.OriginModelName
-
 	c.JSON(http.StatusOK, ov)
 	return dResp.ID, responseBody, nil
+}
+
+func buildSeedanceNativeCreateTaskData(c *gin.Context, info *relaycommon.RelayInfo) ([]byte, error) {
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return nil, err
+	}
+	serviceTier := "default"
+	if req.Metadata != nil {
+		if raw, ok := req.Metadata["service_tier"].(string); ok && raw != "" {
+			serviceTier = raw
+		}
+	}
+	now := time.Now().Unix()
+	data := map[string]interface{}{
+		"id":           info.PublicTaskID,
+		"model":        info.OriginModelName,
+		"status":       "queued",
+		"content":      map[string]string{"video_url": ""},
+		"service_tier": serviceTier,
+		"request":      req.Metadata,
+		"created_at":   now,
+		"updated_at":   now,
+	}
+	if req.Duration != 0 {
+		data["duration"] = req.Duration
+	} else if req.Metadata != nil {
+		if duration, ok := req.Metadata["duration"]; ok {
+			data["duration"] = duration
+		}
+	}
+	return common.Marshal(data)
 }
 
 // FetchTask fetch task status

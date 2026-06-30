@@ -159,8 +159,11 @@ func (p TaskPrivateData) Value() (driver.Value, error) {
 // SyncTaskQueryParams 用于包含所有搜索条件的结构体，可以根据需求添加更多字段
 type SyncTaskQueryParams struct {
 	Platform       constant.TaskPlatform
+	Platforms      []constant.TaskPlatform
 	ChannelID      string
 	TaskID         string
+	TaskIDs        []string
+	Model          string
 	UserID         string
 	Action         string
 	Status         string
@@ -218,6 +221,9 @@ func TaskGetAllUserTask(userId int, startIdx int, num int, queryParams SyncTaskQ
 	if queryParams.TaskID != "" {
 		query = query.Where("task_id = ?", queryParams.TaskID)
 	}
+	if len(queryParams.TaskIDs) != 0 {
+		query = query.Where("task_id in (?)", queryParams.TaskIDs)
+	}
 	if queryParams.Action != "" {
 		query = query.Where("action = ?", queryParams.Action)
 	}
@@ -226,6 +232,9 @@ func TaskGetAllUserTask(userId int, startIdx int, num int, queryParams SyncTaskQ
 	}
 	if queryParams.Platform != "" {
 		query = query.Where("platform = ?", queryParams.Platform)
+	}
+	if len(queryParams.Platforms) != 0 {
+		query = query.Where("platform in (?)", queryParams.Platforms)
 	}
 	if queryParams.StartTimestamp != 0 {
 		// 假设您已将前端传来的时间戳转换为数据库所需的时间格式，并处理了时间戳的验证和解析
@@ -258,6 +267,9 @@ func TaskGetAllTasks(startIdx int, num int, queryParams SyncTaskQueryParams) []*
 	if queryParams.Platform != "" {
 		query = query.Where("platform = ?", queryParams.Platform)
 	}
+	if len(queryParams.Platforms) != 0 {
+		query = query.Where("platform in (?)", queryParams.Platforms)
+	}
 	if queryParams.UserID != "" {
 		query = query.Where("user_id = ?", queryParams.UserID)
 	}
@@ -266,6 +278,9 @@ func TaskGetAllTasks(startIdx int, num int, queryParams SyncTaskQueryParams) []*
 	}
 	if queryParams.TaskID != "" {
 		query = query.Where("task_id = ?", queryParams.TaskID)
+	}
+	if len(queryParams.TaskIDs) != 0 {
+		query = query.Where("task_id in (?)", queryParams.TaskIDs)
 	}
 	if queryParams.Action != "" {
 		query = query.Where("action = ?", queryParams.Action)
@@ -471,6 +486,9 @@ func TaskCountAllTasks(queryParams SyncTaskQueryParams) int64 {
 	if queryParams.Platform != "" {
 		query = query.Where("platform = ?", queryParams.Platform)
 	}
+	if len(queryParams.Platforms) != 0 {
+		query = query.Where("platform in (?)", queryParams.Platforms)
+	}
 	if queryParams.UserID != "" {
 		query = query.Where("user_id = ?", queryParams.UserID)
 	}
@@ -479,6 +497,9 @@ func TaskCountAllTasks(queryParams SyncTaskQueryParams) int64 {
 	}
 	if queryParams.TaskID != "" {
 		query = query.Where("task_id = ?", queryParams.TaskID)
+	}
+	if len(queryParams.TaskIDs) != 0 {
+		query = query.Where("task_id in (?)", queryParams.TaskIDs)
 	}
 	if queryParams.Action != "" {
 		query = query.Where("action = ?", queryParams.Action)
@@ -503,6 +524,9 @@ func TaskCountAllUserTask(userId int, queryParams SyncTaskQueryParams) int64 {
 	if queryParams.TaskID != "" {
 		query = query.Where("task_id = ?", queryParams.TaskID)
 	}
+	if len(queryParams.TaskIDs) != 0 {
+		query = query.Where("task_id in (?)", queryParams.TaskIDs)
+	}
 	if queryParams.Action != "" {
 		query = query.Where("action = ?", queryParams.Action)
 	}
@@ -511,6 +535,9 @@ func TaskCountAllUserTask(userId int, queryParams SyncTaskQueryParams) int64 {
 	}
 	if queryParams.Platform != "" {
 		query = query.Where("platform = ?", queryParams.Platform)
+	}
+	if len(queryParams.Platforms) != 0 {
+		query = query.Where("platform in (?)", queryParams.Platforms)
 	}
 	if queryParams.StartTimestamp != 0 {
 		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)

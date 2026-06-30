@@ -3,11 +3,13 @@ package model
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -176,6 +178,48 @@ func TestUpdateWithStatus_Win(t *testing.T) {
 	require.NoError(t, DB.First(&reloaded, task.ID).Error)
 	assert.EqualValues(t, TaskStatusSuccess, reloaded.Status)
 	assert.Equal(t, "100%", reloaded.Progress)
+}
+
+func TestTaskGetAllUserTaskFiltersMultipleTaskIDs(t *testing.T) {
+	truncateTables(t)
+
+	insertTask(t, &Task{TaskID: "task_keep_a", UserId: 1, Status: TaskStatusSuccess})
+	insertTask(t, &Task{TaskID: "task_keep_b", UserId: 1, Status: TaskStatusQueued})
+	insertTask(t, &Task{TaskID: "task_other", UserId: 1, Status: TaskStatusSuccess})
+	insertTask(t, &Task{TaskID: "task_keep_a", UserId: 2, Status: TaskStatusSuccess})
+
+	tasks := TaskGetAllUserTask(1, 0, 10, SyncTaskQueryParams{
+		TaskIDs: []string{"task_keep_a", "task_keep_b"},
+	})
+
+	require.Len(t, tasks, 2)
+	gotIDs := []string{tasks[0].TaskID, tasks[1].TaskID}
+	assert.ElementsMatch(t, []string{"task_keep_a", "task_keep_b"}, gotIDs)
+	assert.EqualValues(t, 2, TaskCountAllUserTask(1, SyncTaskQueryParams{
+		TaskIDs: []string{"task_keep_a", "task_keep_b"},
+	}))
+}
+
+func TestTaskGetAllUserTaskFiltersMultiplePlatforms(t *testing.T) {
+	truncateTables(t)
+
+	insertTask(t, &Task{TaskID: "task_doubao", UserId: 1, Platform: constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeDoubaoVideo)), Status: TaskStatusSuccess})
+	insertTask(t, &Task{TaskID: "task_volc", UserId: 1, Platform: constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeVolcEngine)), Status: TaskStatusSuccess})
+	insertTask(t, &Task{TaskID: "task_sora", UserId: 1, Platform: constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeSora)), Status: TaskStatusSuccess})
+	insertTask(t, &Task{TaskID: "task_other_user", UserId: 2, Platform: constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeDoubaoVideo)), Status: TaskStatusSuccess})
+
+	query := SyncTaskQueryParams{
+		Platforms: []constant.TaskPlatform{
+			constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeDoubaoVideo)),
+			constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeVolcEngine)),
+		},
+	}
+
+	tasks := TaskGetAllUserTask(1, 0, 10, query)
+	require.Len(t, tasks, 2)
+	gotIDs := []string{tasks[0].TaskID, tasks[1].TaskID}
+	assert.ElementsMatch(t, []string{"task_doubao", "task_volc"}, gotIDs)
+	assert.EqualValues(t, 2, TaskCountAllUserTask(1, query))
 }
 
 func TestUpdateWithStatus_Lose(t *testing.T) {
