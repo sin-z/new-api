@@ -1,5 +1,20 @@
 # Changes
 
+## 2026-07-03
+
+- 回改 Seedance native -> OpenAI bridge 的上游请求体转换：native 路径不再把 `duration` 写入内部 `TaskSubmitReq.Duration/Seconds`，Doubao 上游调用只以 `metadata.duration` 为准。
+- Doubao Seedance 上游 `requestPayload` 补充 `priority` 字段，metadata 中的 `priority` 会进入实际上游 JSON body。
+- Doubao adaptor 检测到 metadata 原生 `content` 时保序透传全部 content，不再删除多个 text 后只追加第一个 prompt；旧 OpenAI Video 路径无原生 `content` 时继续按 `images + prompt` 组装。
+- 按“便于后续跟进 new-api 上游更新”的要求收窄 Doubao adaptor diff：`DoResponse` 仅在 native response 分支前置新增处理并提前返回，默认 OpenAI Video response 原代码路径保持原样；`convertToRequestPayload` 仅在 `hasNativeContent` 时提前返回，其余原逻辑保持原样。
+
+## 2026-07-02
+
+- 实现 Seedance 2.0 BytePlus / ModelArk native `/api/v3/contents/generations/tasks` create / get / list：create 在 native API handler 内转为内部 OpenAI Video task request 并复用现有 relay task 提交、计费、落库和轮询链路；get/list 使用 public task id 和当前 user 渲染 native task object。
+- Doubao task adaptor create 响应按 native mode 返回 `{ "id": "<public task id>" }`，默认 OpenAI Video wrapper 行为保持不变；`Task.Data` 写入可被 native renderer 与 OpenAI Video converter 复用的 canonical request snapshot。
+- 新增 native error shell、native renderable channel guard（当前仅 DoubaoVideo / VolcEngine）、最近 7 天 list、分页、status、task_ids、model、service_tier 过滤；过滤在 native handler 内完成，未改 `model/task.go` 查询接口。
+- 新增单元和路由测试覆盖 handler 内 native->OpenAI 请求转换、参数错误、鉴权错误外壳、route 注册、get/list 用户隔离和过滤、Doubao native/OpenAI 响应拆分、canonical taskData 和 OpenAI Video 兼容转换。
+- 验证：相关包 `go test`、`go vet`、`git diff --check`、CodeGraph status 均通过；根包空跑因缺 `web/classic/dist` 阻塞，已在计划中记录。
+
 ## 2026-06-28
 
 - 新增 XRTokenArkVideo 薄 task adaptor 计划与技术方案，并已进入 Phase 2/3 实现回改。

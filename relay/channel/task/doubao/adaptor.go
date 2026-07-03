@@ -2,6 +2,7 @@ package doubao
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -59,6 +60,7 @@ type requestPayload struct {
 	Seed        *dto.IntValue  `json:"seed,omitempty"`
 	CameraFixed *dto.BoolValue `json:"camera_fixed,omitempty"`
 	Watermark   *dto.BoolValue `json:"watermark,omitempty"`
+	Priority    *dto.IntValue  `json:"priority,omitempty"`
 }
 
 type responsePayload struct {
@@ -94,6 +96,38 @@ type responseTask struct {
 	} `json:"error"`
 	CreatedAt int64 `json:"created_at"`
 	UpdatedAt int64 `json:"updated_at"`
+}
+
+type nativeCreateTaskData struct {
+	ID      string `json:"id"`
+	Model   string `json:"model,omitempty"`
+	Status  string `json:"status,omitempty"`
+	Content struct {
+		VideoURL string `json:"video_url"`
+	} `json:"content"`
+	Error struct {
+		Code    string `json:"code,omitempty"`
+		Message string `json:"message,omitempty"`
+	} `json:"error"`
+	Request struct {
+		Resolution    string         `json:"resolution,omitempty"`
+		Ratio         string         `json:"ratio,omitempty"`
+		Duration      int            `json:"duration,omitempty"`
+		GenerateAudio *dto.BoolValue `json:"generate_audio,omitempty"`
+	} `json:"request"`
+	Usage struct {
+		CompletionTokens int `json:"completion_tokens,omitempty"`
+		TotalTokens      int `json:"total_tokens,omitempty"`
+	} `json:"usage"`
+	Resolution            string         `json:"resolution,omitempty"`
+	Ratio                 string         `json:"ratio,omitempty"`
+	Duration              int            `json:"duration,omitempty"`
+	GenerateAudio         *dto.BoolValue `json:"generate_audio,omitempty"`
+	ServiceTier           string         `json:"service_tier,omitempty"`
+	ExecutionExpiresAfter int            `json:"execution_expires_after,omitempty"`
+	Priority              int            `json:"priority,omitempty"`
+	CreatedAt             int64          `json:"created_at,omitempty"`
+	UpdatedAt             int64          `json:"updated_at,omitempty"`
 }
 
 // ============================
@@ -224,6 +258,15 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
+	if c.GetBool("seedance_native_response") {
+		taskData = responseBody
+		if canonicalData, buildErr := buildNativeCreateTaskData(c, info, dResp.ID); buildErr == nil {
+			taskData = canonicalData
+		}
+		c.JSON(http.StatusOK, gin.H{"id": info.PublicTaskID})
+		return dResp.ID, taskData, nil
+	}
+
 	ov := dto.NewOpenAIVideo()
 	ov.ID = info.PublicTaskID
 	ov.TaskID = info.PublicTaskID
@@ -273,7 +316,11 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 		Content: []ContentItem{},
 	}
 
-	// Add images if present
+	hasNativeContent := false
+	if req.Metadata != nil {
+		_, hasNativeContent = req.Metadata["content"]
+	}
+
 	if req.HasImage() {
 		for _, imgURL := range req.Images {
 			r.Content = append(r.Content, ContentItem{
@@ -290,10 +337,13 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
 
+	if hasNativeContent {
+		return &r, nil
+	}
+
 	if sec, _ := strconv.Atoi(req.Seconds); sec > 0 {
 		r.Duration = lo.ToPtr(dto.IntValue(sec))
 	}
-
 	r.Content = lo.Reject(r.Content, func(c ContentItem, _ int) bool { return c.Type == "text" })
 	r.Content = append(r.Content, ContentItem{
 		Type: "text",
@@ -301,6 +351,86 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 	})
 
 	return &r, nil
+}
+
+// buildNativeCreateTaskData 将创建请求中的 native 字段写入 Task.Data 快照。
+// 该快照只保存上游 task id 和请求事实，public id 仍只存在于本地 task row。
+func buildNativeCreateTaskData(c *gin.Context, info *relaycommon.RelayInfo, upstreamTaskID string) ([]byte, error) {
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().Unix()
+	data := nativeCreateTaskData{
+		ID:        upstreamTaskID,
+		Model:     info.OriginModelName,
+		Status:    "queued",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if info.ChannelMeta != nil && info.ChannelMeta.UpstreamModelName != "" {
+		data.Model = info.ChannelMeta.UpstreamModelName
+	}
+	data.Resolution = metadataString(req.Metadata, "resolution")
+	data.Ratio = metadataString(req.Metadata, "ratio")
+	data.Duration = metadataInt(req.Metadata, "duration")
+	if data.Duration == 0 {
+		data.Duration = req.Duration
+	}
+	if data.Duration == 0 {
+		data.Duration, _ = strconv.Atoi(req.Seconds)
+	}
+	data.GenerateAudio = metadataBool(req.Metadata, "generate_audio")
+	data.ServiceTier = metadataString(req.Metadata, "service_tier")
+	if data.ServiceTier == "" {
+		data.ServiceTier = "default"
+	}
+	data.ExecutionExpiresAfter = metadataInt(req.Metadata, "execution_expires_after")
+	data.Priority = metadataInt(req.Metadata, "priority")
+	data.Request.Resolution = data.Resolution
+	data.Request.Ratio = data.Ratio
+	data.Request.Duration = data.Duration
+	data.Request.GenerateAudio = data.GenerateAudio
+	return common.Marshal(data)
+}
+
+func metadataString(metadata map[string]interface{}, key string) string {
+	if metadata == nil {
+		return ""
+	}
+	value, _ := metadata[key].(string)
+	return value
+}
+
+func metadataInt(metadata map[string]interface{}, key string) int {
+	if metadata == nil {
+		return 0
+	}
+	switch value := metadata[key].(type) {
+	case int:
+		return value
+	case int64:
+		return int(value)
+	case float64:
+		return int(value)
+	case json.Number:
+		i, _ := value.Int64()
+		return int(i)
+	default:
+		return 0
+	}
+}
+
+func metadataBool(metadata map[string]interface{}, key string) *dto.BoolValue {
+	if metadata == nil {
+		return nil
+	}
+	switch value := metadata[key].(type) {
+	case bool:
+		return lo.ToPtr(dto.BoolValue(value))
+	default:
+		return nil
+	}
 }
 
 func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, error) {
