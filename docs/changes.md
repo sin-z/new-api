@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-07-06
+
+- 将 Doubao Seedance 2.0 / fast 分辨率价格表从人民币口径调整为 BytePlus 海外官方 USD / M tokens 口径：标准模型使用 7.0、4.3、7.7、4.7、4.0、2.4；fast 模型使用 5.6、3.3。
+- 新增 `GetVideoInputRatio` 倍率单测，覆盖标准模型 480p/720p、1080p、4k、视频输入、fast 视频输入、fast 1080p 缺省回退和未知模型。
+
 ## 2026-07-03
 
 - 回改 Seedance native -> OpenAI bridge 的上游请求体转换：native 路径不再把 `duration` 写入内部 `TaskSubmitReq.Duration/Seconds`，Doubao 上游调用只以 `metadata.duration` 为准。

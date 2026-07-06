@@ -20,21 +20,20 @@ type videoPriceKey struct {
 	hasVideo bool
 }
 
-// videoPriceTable 各模型在不同 (输出分辨率档, 是否含视频输入) 下的单价（元/百万 token）。
-// 其中零值键 {480p/720p, 不含视频} 为基准价，等于管理员应配置的 ModelRatio；
-// 计费时取 实际单价/基准价 作为 OtherRatio。
+// videoPriceTable 各模型在不同 (输出分辨率档, 是否含视频输入) 下的单价（USD / M tokens）。
+// 其中零值键 {480p/720p, 不含视频} 为模型基准单价；计费时取 实际单价/基准单价 作为 OtherRatio。
 var videoPriceTable = map[string]map[videoPriceKey]float64{
 	"doubao-seedance-2-0-260128": {
-		{hasVideo: false}:                46.0,
-		{hasVideo: true}:                 28.0,
-		{is1080p: true, hasVideo: false}: 51.0,
-		{is1080p: true, hasVideo: true}:  31.0,
-		{is4k: true, hasVideo: false}:    26.0,
-		{is4k: true, hasVideo: true}:     16.0,
+		{hasVideo: false}:                7.0,
+		{hasVideo: true}:                 4.3,
+		{is1080p: true, hasVideo: false}: 7.7,
+		{is1080p: true, hasVideo: true}:  4.7,
+		{is4k: true, hasVideo: false}:    4.0,
+		{is4k: true, hasVideo: true}:     2.4,
 	},
 	"doubao-seedance-2-0-fast-260128": {
-		{hasVideo: false}: 37.0,
-		{hasVideo: true}:  22.0,
+		{hasVideo: false}: 5.6,
+		{hasVideo: true}:  3.3,
 	},
 }
 
