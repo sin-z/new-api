@@ -26,13 +26,13 @@ type responsePayload struct {
 }
 
 type responseTask struct {
-	ID        string `json:"id"`
-	Model     string `json:"model"`
-	Status    string `json:"status"`
-	VideoURL  string `json:"video_url"`
-	Duration  any    `json:"duration,omitempty"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
+	ID        string                  `json:"id"`
+	Model     string                  `json:"model"`
+	Status    string                  `json:"status"`
+	VideoURL  string                  `json:"video_url"`
+	Duration  any                     `json:"duration,omitempty"`
+	CreatedAt common.FlexibleUnixTime `json:"created_at"`
+	UpdatedAt common.FlexibleUnixTime `json:"updated_at"`
 	Error     struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
@@ -109,12 +109,21 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
+	if c.GetBool("seedance_native_response") {
+		taskData = responseBody
+		if canonicalData, buildErr := taskdoubao.BuildNativeCreateTaskData(c, info, xResp.ID); buildErr == nil {
+			taskData = canonicalData
+		}
+		c.JSON(http.StatusOK, gin.H{"id": info.PublicTaskID})
+		return xResp.ID, taskData, nil
+	}
+
 	ov := dto.NewOpenAIVideo()
 	ov.ID = info.PublicTaskID
 	ov.TaskID = info.PublicTaskID
 	ov.CreatedAt = time.Now().Unix()
 	if xResp.CreatedAt > 0 {
-		ov.CreatedAt = xResp.CreatedAt
+		ov.CreatedAt = xResp.CreatedAt.Unix()
 	}
 	ov.Model = info.OriginModelName
 
@@ -213,10 +222,10 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 	openAIVideo.CreatedAt = originTask.CreatedAt
 	openAIVideo.CompletedAt = originTask.UpdatedAt
 	if xResp.CreatedAt > 0 {
-		openAIVideo.CreatedAt = xResp.CreatedAt
+		openAIVideo.CreatedAt = xResp.CreatedAt.Unix()
 	}
 	if xResp.UpdatedAt > 0 {
-		openAIVideo.CompletedAt = xResp.UpdatedAt
+		openAIVideo.CompletedAt = xResp.UpdatedAt.Unix()
 	}
 	openAIVideo.Seconds = durationToString(xResp.Duration)
 	openAIVideo.Model = originTask.Properties.OriginModelName

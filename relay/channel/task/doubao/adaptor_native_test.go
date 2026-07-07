@@ -66,6 +66,37 @@ func TestConvertToRequestPayloadKeepsNativeMetadataFields(t *testing.T) {
 	}
 }
 
+func TestConvertToRequestPayloadOmitsDefaultServiceTierForSeedance20(t *testing.T) {
+	t.Parallel()
+
+	req := &relaycommon.TaskSubmitReq{
+		Prompt: "first prompt",
+		Model:  "doubao-seedance-2-0-260128",
+		Metadata: map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{"type": "text", "text": "first prompt"},
+			},
+			"service_tier": "default",
+		},
+	}
+
+	payload, err := (&TaskAdaptor{}).convertToRequestPayload(req)
+	if err != nil {
+		t.Fatalf("convertToRequestPayload returned error: %v", err)
+	}
+
+	if payload.ServiceTier != "" {
+		t.Fatalf("service_tier = %q, want empty upstream field for default Seedance 2.0 tier", payload.ServiceTier)
+	}
+	body, err := common.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload returned error: %v", err)
+	}
+	if strings.Contains(string(body), "service_tier") {
+		t.Fatalf("payload body = %s, must omit service_tier for default Seedance 2.0 tier", body)
+	}
+}
+
 func TestConvertToRequestPayloadBuildsLegacyOpenAIVideoContentWithoutNativeMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -135,6 +166,69 @@ func TestDoResponseCanReturnNativeCreateBodyWithoutChangingTaskData(t *testing.T
 	}
 	if recorder.Body.String() != `{"id":"task_public_123"}` {
 		t.Fatalf("response body = %s, want native public id body", recorder.Body.String())
+	}
+}
+
+func TestDoResponseAcceptsNativeCreateStringTimestamps(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("seedance_native_response", true)
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "seedance-2-0-pro",
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{
+			PublicTaskID: "task_public_123",
+		},
+	}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: ioNopCloser(`{
+			"id":"upstream_task_123",
+			"model":"volcengine-overseas/dreamina-seedance-2-0-260128",
+			"status":"queued",
+			"created_at":"2026-07-07T02:40:14Z",
+			"updated_at":"2026-07-07T02:40:14Z"
+		}`),
+	}
+
+	upstreamID, taskData, taskErr := (&TaskAdaptor{}).DoResponse(ctx, resp, info)
+	if taskErr != nil {
+		t.Fatalf("DoResponse returned task error: %v", taskErr)
+	}
+	if upstreamID != "upstream_task_123" {
+		t.Fatalf("upstreamID = %q, want upstream_task_123", upstreamID)
+	}
+	if recorder.Body.String() != `{"id":"task_public_123"}` {
+		t.Fatalf("response body = %s, want native public id body", recorder.Body.String())
+	}
+	var stored struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(taskData, &stored); err != nil {
+		t.Fatalf("taskData is not JSON: %v", err)
+	}
+	if stored.ID != "upstream_task_123" {
+		t.Fatalf("taskData.id = %q, want upstream_task_123", stored.ID)
+	}
+}
+
+func TestParseTaskResultAcceptsStringTimestamps(t *testing.T) {
+	t.Parallel()
+
+	taskInfo, err := (&TaskAdaptor{}).ParseTaskResult([]byte(`{
+		"id":"upstream_task_123",
+		"model":"volcengine-overseas/dreamina-seedance-2-0-260128",
+		"status":"queued",
+		"created_at":"2026-07-07T02:40:14Z",
+		"updated_at":"2026-07-07T02:40:14Z"
+	}`))
+	if err != nil {
+		t.Fatalf("ParseTaskResult returned error: %v", err)
+	}
+	if taskInfo.Status != model.TaskStatusQueued {
+		t.Fatalf("Status = %q, want %q", taskInfo.Status, model.TaskStatusQueued)
 	}
 }
 

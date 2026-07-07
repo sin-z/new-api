@@ -99,6 +99,25 @@ func TestSeedanceNativeBuildOpenAIRequestRejectsUnsupportedServiceTier(t *testin
 	require.Contains(t, recorder.Body.String(), "InvalidParameter.Unsupported")
 }
 
+func TestSeedanceNativeBuildOpenAIRequestRejectsInvalidDuration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v3/contents/generations/tasks", strings.NewReader(`{
+		"model":"seedance-2-0-pro",
+		"content":[{"type":"text","text":"prompt"}],
+		"duration":1
+	}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	_, _, ok := seedanceNativeBuildOpenAIRequest(ctx)
+
+	require.False(t, ok)
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "InvalidParameter.InvalidValue")
+	require.Contains(t, recorder.Body.String(), "duration")
+}
+
 func TestBuildSeedanceNativeTaskResponseUsesPublicIDAndCanonicalData(t *testing.T) {
 	t.Parallel()
 
@@ -171,7 +190,7 @@ func TestRenderSeedanceTaskNotFoundUsesNativeErrorShell(t *testing.T) {
 	}
 }
 
-func TestIsSeedanceNativeRenderableTaskOnlyAllowsDoubaoAndVolcEngine(t *testing.T) {
+func TestIsSeedanceNativeRenderableTaskAllowsSeedanceCompatibleChannels(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -181,7 +200,7 @@ func TestIsSeedanceNativeRenderableTaskOnlyAllowsDoubaoAndVolcEngine(t *testing.
 	}{
 		{name: "doubao video", platform: constant.TaskPlatform("54"), want: true},
 		{name: "volcengine", platform: constant.TaskPlatform("45"), want: true},
-		{name: "xrtoken excluded before native C1", platform: constant.TaskPlatform("101"), want: false},
+		{name: "xrtoken ark video", platform: constant.TaskPlatform("101"), want: true},
 		{name: "sora excluded", platform: constant.TaskPlatform("1"), want: false},
 	}
 	for _, tc := range cases {
@@ -241,6 +260,49 @@ func TestSeedanceNativeTaskGetReturnsNativeObjectForOwner(t *testing.T) {
 	require.Equal(t, 5, resp.Duration)
 }
 
+func TestSeedanceNativeTaskGetReadsXRTokenTopLevelVideoURL(t *testing.T) {
+	setupSeedanceNativeControllerTestDB(t)
+	insertSeedanceNativeControllerTask(t, &model.Task{
+		TaskID:     "task_public_123",
+		UserId:     10,
+		Platform:   constant.TaskPlatform("101"),
+		Status:     model.TaskStatusSuccess,
+		SubmitTime: time.Now().Unix(),
+		Properties: model.Properties{
+			OriginModelName: "doubao-seedance-2-0-260128",
+		},
+		PrivateData: model.TaskPrivateData{
+			UpstreamTaskID: "upstream_task_123",
+		},
+		Data: []byte(`{
+			"id":"upstream_task_123",
+			"model":"volcengine/doubao-seedance-2-0-260128",
+			"status":"succeeded",
+			"video_url":"https://cdn.example.com/xrtoken.mp4",
+			"created_at":"2026-07-07T02:40:14Z",
+			"updated_at":"2026-07-07T02:41:14Z"
+		}`),
+	})
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v3/contents/generations/tasks/task_public_123", nil)
+	ctx.Params = gin.Params{{Key: "task_id", Value: "task_public_123"}}
+	ctx.Set("id", 10)
+
+	SeedanceNativeTaskGet(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.NotContains(t, recorder.Body.String(), "upstream_task_123")
+	var resp seedanceNativeTaskResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
+	require.Equal(t, "task_public_123", resp.ID)
+	require.Equal(t, "succeeded", resp.Status)
+	require.Equal(t, "https://cdn.example.com/xrtoken.mp4", resp.Content.VideoURL)
+	require.EqualValues(t, 1783392014, resp.CreatedAt)
+	require.EqualValues(t, 1783392074, resp.UpdatedAt)
+}
+
 func TestSeedanceNativeTaskGetHidesOtherUsersAndUnsupportedChannels(t *testing.T) {
 	setupSeedanceNativeControllerTestDB(t)
 	insertSeedanceNativeControllerTask(t, &model.Task{
@@ -252,15 +314,15 @@ func TestSeedanceNativeTaskGetHidesOtherUsersAndUnsupportedChannels(t *testing.T
 		Data:       []byte(`{"content":{"video_url":"https://cdn.example.com/other.mp4"}}`),
 	})
 	insertSeedanceNativeControllerTask(t, &model.Task{
-		TaskID:     "task_xrtoken",
+		TaskID:     "task_sora",
 		UserId:     10,
-		Platform:   constant.TaskPlatform("101"),
+		Platform:   constant.TaskPlatform("1"),
 		Status:     model.TaskStatusSuccess,
 		SubmitTime: time.Now().Unix(),
-		Data:       []byte(`{"content":{"video_url":"https://cdn.example.com/xrtoken.mp4"}}`),
+		Data:       []byte(`{"content":{"video_url":"https://cdn.example.com/sora.mp4"}}`),
 	})
 
-	for _, taskID := range []string{"task_other_user", "task_xrtoken"} {
+	for _, taskID := range []string{"task_other_user", "task_sora"} {
 		recorder := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(recorder)
 		ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v3/contents/generations/tasks/"+taskID, nil)
@@ -291,7 +353,7 @@ func TestSeedanceNativeTaskListFiltersRecentRenderableTasks(t *testing.T) {
 	insertSeedanceNativeControllerTask(t, &model.Task{
 		TaskID:     "task_other_platform",
 		UserId:     10,
-		Platform:   constant.TaskPlatform("101"),
+		Platform:   constant.TaskPlatform("1"),
 		Status:     model.TaskStatusSuccess,
 		SubmitTime: now,
 		Properties: model.Properties{

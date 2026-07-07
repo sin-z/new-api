@@ -83,6 +83,79 @@ func TestDoResponseReturnsUpstreamTaskIDAndPublicVideoID(t *testing.T) {
 	}
 }
 
+func TestDoResponseAcceptsStringTimestamps(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Set("seedance_native_response", true)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/video/generations", strings.NewReader(`{
+		"prompt":"prompt",
+		"model":"doubao-seedance-2-0-260128",
+		"metadata":{
+			"ratio":"16:9",
+			"duration":4,
+			"generate_audio":true,
+			"service_tier":"default"
+		}
+	}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "doubao-seedance-2-0-260128",
+		TaskRelayInfo: &relaycommon.TaskRelayInfo{
+			PublicTaskID: "public_task_123",
+		},
+	}
+	if taskErr := (&TaskAdaptor{}).ValidateRequestAndSetAction(c, info); taskErr != nil {
+		t.Fatalf("ValidateRequestAndSetAction returned task error: %v", taskErr)
+	}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioNopCloser(`{"id":"upstream_task_123","model":"volcengine/doubao-seedance-2-0-260128","status":"queued","created_at":"2026-07-07T02:40:14Z","updated_at":"2026-07-07T02:40:14Z"}`),
+	}
+
+	taskID, taskData, taskErr := (&TaskAdaptor{}).DoResponse(c, resp, info)
+	if taskErr != nil {
+		t.Fatalf("DoResponse returned task error: %v", taskErr)
+	}
+	if taskID != "upstream_task_123" {
+		t.Fatalf("taskID = %q, want upstream task id", taskID)
+	}
+	if recorder.Body.String() != `{"id":"public_task_123"}` {
+		t.Fatalf("response body = %s, want native public id body", recorder.Body.String())
+	}
+	var stored struct {
+		ID          string `json:"id"`
+		Ratio       string `json:"ratio"`
+		Duration    int    `json:"duration"`
+		ServiceTier string `json:"service_tier"`
+	}
+	if err := json.Unmarshal(taskData, &stored); err != nil {
+		t.Fatalf("taskData is not JSON: %v", err)
+	}
+	if stored.ID != "upstream_task_123" || stored.Ratio != "16:9" || stored.Duration != 4 || stored.ServiceTier != "default" {
+		t.Fatalf("taskData = %#v, want raw upstream data", stored)
+	}
+}
+
+func TestParseTaskResultAcceptsStringTimestamps(t *testing.T) {
+	t.Parallel()
+
+	taskInfo, err := (&TaskAdaptor{}).ParseTaskResult([]byte(`{
+		"id":"upstream_task_123",
+		"status":"queued",
+		"created_at":"2026-07-07T02:40:14Z",
+		"updated_at":"2026-07-07T02:40:14Z"
+	}`))
+	if err != nil {
+		t.Fatalf("ParseTaskResult returned error: %v", err)
+	}
+	if taskInfo.Status != model.TaskStatusQueued {
+		t.Fatalf("Status = %q, want %q", taskInfo.Status, model.TaskStatusQueued)
+	}
+}
+
 func TestParseTaskResultReadsTopLevelVideoURL(t *testing.T) {
 	t.Parallel()
 

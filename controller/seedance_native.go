@@ -115,14 +115,15 @@ type seedanceCanonicalTaskData struct {
 	Usage                 seedanceNativeTaskUsage    `json:"usage"`
 	Seed                  int                        `json:"seed"`
 	ServiceTier           string                     `json:"service_tier"`
-	CreatedAt             int64                      `json:"created_at"`
-	UpdatedAt             int64                      `json:"updated_at"`
+	CreatedAt             common.FlexibleUnixTime    `json:"created_at"`
+	UpdatedAt             common.FlexibleUnixTime    `json:"updated_at"`
 	Resolution            string                     `json:"resolution"`
 	Ratio                 string                     `json:"ratio"`
 	Duration              int                        `json:"duration"`
 	GenerateAudio         *bool                      `json:"generate_audio"`
 	ExecutionExpiresAfter int                        `json:"execution_expires_after"`
 	Priority              int                        `json:"priority"`
+	VideoURL              string                     `json:"video_url"`
 }
 
 type seedanceNativeTaskListResponse struct {
@@ -204,6 +205,9 @@ func validateSeedanceNativeCreateRequest(req seedanceNativeRequest) *seedanceNat
 	}
 	if req.ServiceTier != "" && req.ServiceTier != "default" {
 		return &seedanceNativeValidationError{code: "InvalidParameter.Unsupported", message: "service_tier is not configurable for Seedance 2.0"}
+	}
+	if req.Duration != nil && *req.Duration != -1 && (*req.Duration < 4 || *req.Duration > 15) {
+		return &seedanceNativeValidationError{code: "InvalidParameter.InvalidValue", message: "duration must be -1 or between 4 and 15 for Seedance 2.0"}
 	}
 	if req.Frames != nil {
 		return &seedanceNativeValidationError{code: "InvalidParameter.Unsupported", message: "frames is not supported for Seedance 2.0"}
@@ -631,11 +635,11 @@ func BuildSeedanceNativeTaskResponse(task *model.Task) (*seedanceNativeTaskRespo
 	}
 	createdAt := task.CreatedAt
 	if data.CreatedAt > 0 {
-		createdAt = data.CreatedAt
+		createdAt = data.CreatedAt.Unix()
 	}
 	updatedAt := task.UpdatedAt
 	if data.UpdatedAt > 0 {
-		updatedAt = data.UpdatedAt
+		updatedAt = data.UpdatedAt.Unix()
 	}
 	resp := &seedanceNativeTaskResponse{
 		ID:            task.TaskID,
@@ -681,6 +685,9 @@ func BuildSeedanceNativeTaskResponse(task *model.Task) (*seedanceNativeTaskRespo
 	}
 	if resp.ServiceTier == "" {
 		resp.ServiceTier = "default"
+	}
+	if resp.Content.VideoURL == "" {
+		resp.Content.VideoURL = data.VideoURL
 	}
 	if resp.Content.VideoURL == "" {
 		resp.Content.VideoURL = task.GetResultURL()
@@ -853,7 +860,8 @@ func IsSeedanceNativeRenderableTask(task *model.Task) bool {
 	}
 	switch task.Platform {
 	case constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeDoubaoVideo)),
-		constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeVolcEngine)):
+		constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeVolcEngine)),
+		constant.TaskPlatform(strconv.Itoa(constant.ChannelTypeXRTokenArkVideo)):
 		return true
 	default:
 		return false

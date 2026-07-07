@@ -95,8 +95,8 @@ type responseTask struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
 	} `json:"error"`
-	CreatedAt int64 `json:"created_at"`
-	UpdatedAt int64 `json:"updated_at"`
+	CreatedAt common.FlexibleUnixTime `json:"created_at"`
+	UpdatedAt common.FlexibleUnixTime `json:"updated_at"`
 }
 
 type nativeCreateTaskData struct {
@@ -262,7 +262,7 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 
 	if c.GetBool("seedance_native_response") {
 		taskData = responseBody
-		if canonicalData, buildErr := buildNativeCreateTaskData(c, info, dResp.ID); buildErr == nil {
+		if canonicalData, buildErr := BuildNativeCreateTaskData(c, info, dResp.ID); buildErr == nil {
 			taskData = canonicalData
 		}
 		c.JSON(http.StatusOK, gin.H{"id": info.PublicTaskID})
@@ -338,6 +338,10 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 	if err := taskcommon.UnmarshalMetadata(metadata, &r); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
+	// Seedance 2.0 的默认档位只用于本地 native 快照，上游不接受显式 default。
+	if r.ServiceTier == "default" {
+		r.ServiceTier = ""
+	}
 
 	if hasNativeContent {
 		return &r, nil
@@ -355,9 +359,9 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 	return &r, nil
 }
 
-// buildNativeCreateTaskData 将创建请求中的 native 字段写入 Task.Data 快照。
+// BuildNativeCreateTaskData 将创建请求中的 native 字段写入 Task.Data 快照。
 // 该快照只保存上游 task id 和请求事实，public id 仍只存在于本地 task row。
-func buildNativeCreateTaskData(c *gin.Context, info *relaycommon.RelayInfo, upstreamTaskID string) ([]byte, error) {
+func BuildNativeCreateTaskData(c *gin.Context, info *relaycommon.RelayInfo, upstreamTaskID string) ([]byte, error) {
 	req, err := relaycommon.GetTaskRequest(c)
 	if err != nil {
 		return nil, err
