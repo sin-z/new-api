@@ -25,14 +25,14 @@
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/user/email_login/code` | 向已存在用户邮箱发送登录验证码 |
-| POST | `/api/user/email_login` | 使用邮箱验证码完成登录 |
+| GET | `/api/user/email_login/code` | 向邮箱发送登录 / 注册验证码 |
+| POST | `/api/user/email_login` | 使用邮箱验证码完成登录或自动创建账号后登录 |
 
 ## GET /api/user/email_login/code
 
 ### 描述
 
-向已存在且允许登录的用户邮箱发送一次性登录验证码。该验证码用途与注册邮箱验证、密码重置隔离。
+向邮箱发送一次性登录验证码。邮箱已绑定启用用户时用于登录；邮箱未注册时，在系统 `RegisterEnabled=true` 且邮箱未被现有或软删除账号占用的前提下，可用于后续自动创建账号并登录。该验证码用途与注册邮箱验证、密码重置隔离。
 
 ### 鉴权
 
@@ -42,7 +42,7 @@
 
 | Name | In | Type | Required | Description | Constraints |
 | --- | --- | --- | --- | --- | --- |
-| email | query | string | yes | 接收登录验证码的邮箱地址 | 必须为合法邮箱；必须属于现有用户 |
+| email | query | string | yes | 接收登录 / 注册验证码的邮箱地址 | 必须为合法邮箱；最长 254 字符；已注册邮箱必须属于启用用户；未注册邮箱必须允许注册且未被现有或软删除账号占用 |
 | turnstile | query | string | no | Turnstile token | 仅在站点启用 Turnstile 时校验 |
 
 ### 请求体字段
@@ -58,21 +58,24 @@
 | Condition | HTTP Status | success | message |
 | --- | ---: | --- | --- |
 | 邮箱格式非法 | 200 | false | 本地化参数错误文案 |
-| 邮箱不存在 | 200 | false | 本地化邮箱登录用户不存在文案 |
+| 注册关闭且邮箱未注册 | 200 | false | 本地化注册关闭文案 |
+| 邮箱或同名 username 已被现有 / 软删除账号占用 | 200 | false | 本地化用户已存在文案 |
 | 邮箱对应用户被禁用 | 200 | false | 本地化用户被禁用文案 |
 | SMTP 发送失败 | 200 | false | 发送失败错误信息 |
 | Turnstile 校验失败 | 按现有中间件 | false | 按现有中间件 |
 
 ### 兼容性说明
 
-- 不自动注册不存在邮箱。
+- 发送验证码阶段不创建用户；未注册邮箱只在验证码登录成功后创建用户。
+- 未注册邮箱自动创建账号受 `RegisterEnabled` 控制，不受 `PasswordRegisterEnabled` 控制。
+- 自动创建账号使用完整邮箱作为 `username`、`email`、`display_name`，角色为普通用户，状态为启用。
 - 不复用 `EmailVerificationPurpose`，避免注册验证码可直接登录。
 
 ## POST /api/user/email_login
 
 ### 描述
 
-校验邮箱登录验证码，成功后写入与密码登录一致的 session，并返回登录用户基础信息。
+校验邮箱登录验证码。邮箱已绑定启用用户时直接登录；邮箱未注册时，在系统 `RegisterEnabled=true` 且邮箱未被现有或软删除账号占用的前提下，自动创建普通启用用户后写入与密码登录一致的 session，并返回登录用户基础信息。
 
 ### 鉴权
 
@@ -86,7 +89,7 @@
 
 | Field | Type | Required | Description | Constraints |
 | --- | --- | --- | --- | --- |
-| email | string | yes | 用户邮箱地址 | 必须为合法邮箱；必须属于现有用户 |
+| email | string | yes | 用户邮箱地址 | 必须为合法邮箱；最长 254 字符；已注册邮箱必须属于启用用户；未注册邮箱必须允许注册且未被现有或软删除账号占用 |
 | code | string | yes | 邮箱登录验证码 | 必须匹配未过期的邮箱登录验证码 |
 
 ### 成功响应字段
@@ -105,15 +108,19 @@
 | Condition | HTTP Status | success | message |
 | --- | ---: | --- | --- |
 | 请求体非法 | 200 | false | 本地化参数错误文案 |
-| 邮箱不存在 | 200 | false | 本地化邮箱登录用户不存在文案 |
 | 验证码错误或过期 | 200 | false | 本地化验证码错误文案 |
 | 用户被禁用 | 200 | false | 本地化用户被禁用文案 |
+| 注册关闭且邮箱未注册 | 200 | false | 本地化注册关闭文案 |
+| 邮箱或同名 username 已被现有 / 软删除账号占用 | 200 | false | 本地化用户已存在文案 |
+| 自动创建用户失败 | 200 | false | 创建失败错误信息 |
 | session 保存失败 | 200 | false | 本地化 session 保存失败文案 |
 
 ### 兼容性说明
 
 - 成功响应复用现有 `setupLogin` 输出结构。
 - 验证成功后删除本邮箱登录验证码，避免同一验证码重复使用。
+- 已存在启用用户不受 `RegisterEnabled` 影响，仍可使用邮箱验证码登录。
+- 自动创建账号使用随机内部密码；该密码不通过接口返回，用户后续仍通过邮箱验证码、OAuth 或其他可用登录方式登录。
 
 ## 依赖与约束
 

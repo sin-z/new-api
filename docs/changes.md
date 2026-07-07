@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-07-07
+
+- 将 `GET /api/user/email_login/code` 扩展为邮箱登录 / 注册验证码发送：已存在启用用户沿用登录验证码；未注册邮箱在 `RegisterEnabled=true` 且未被现有或软删除账号占用时允许发码，发送阶段不创建用户。
+- 将 `POST /api/user/email_login` 扩展为邮箱验证码登录 / 自动注册一体化：未注册邮箱验证码校验成功后自动创建普通启用用户，`username`、`email`、`display_name` 均使用完整邮箱，内部密码随机生成；无密码邮箱注册不受 `PasswordRegisterEnabled` 限制。
+- 放宽 `UserNameMaxLength`、`User.Username`、`User.DisplayName`、`User.Email` 校验上限到 254，并在邮箱验证码登录地址校验中拒绝超过 254 字符的邮箱。
+- 补齐 `controller/email_login_test.go` 测试夹具的 `LOG_DB`、`logs` 表、Redis 关闭和 fake SMTP，新增用例覆盖未注册发码不建用户、自动注册登录、loopback HTTP 登录、注册关闭、已存在用户不重复创建、禁用 / 软删除 / username 冲突、254/255 长度边界。
+- 更新 `docs/api_contract.md` 邮箱验证码登录契约，移除“必须属于现有用户 / 不自动注册不存在邮箱”的旧口径。
+
 ## 2026-07-06
 
 - 将 Doubao Seedance 2.0 / fast 分辨率价格表从人民币口径调整为 BytePlus 海外官方 USD / M tokens 口径：标准模型使用 7.0、4.3、7.7、4.7、4.0、2.4；fast 模型使用 5.6、3.3。

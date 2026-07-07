@@ -1,6 +1,12 @@
 # Important Findings
 
 - 日期：2026-07-07
+  场景：邮箱验证码登录改为注册 / 登录一体化
+  发现内容：`new-api` 的 `GET /api/user/email_login/code` 已支持未注册邮箱在 `RegisterEnabled=true` 且邮箱 / 同名 username 未被现有或软删除账号占用时发码，但发码阶段不创建用户；`POST /api/user/email_login` 在邮箱登录验证码校验成功后才自动创建普通启用用户并登录，自动创建用户的 `username`、`email`、`display_name` 均为完整邮箱，内部密码随机生成且不受 `PasswordRegisterEnabled` 约束。邮箱验证码 purpose 继续与注册验证码 purpose 隔离。
+  依据来源：源码 `controller/user.go`、`model/user.go`、`docs/api_contract.md`；测试 `controller/email_login_test.go`、`common/verification_email_login_test.go`；验证命令 `go test ./controller -run 'Test.*EmailLogin' -count=1`、`go test ./common -run TestEmailLoginPurposeIsIsolatedFromRegistrationPurpose -count=1`、`go test ./model -run User -count=1`。
+  适用范围：后续维护邮箱验证码登录、注册开关、无密码邮箱注册、用户模型长度、Console 登录文案和接口契约。
+
+- 日期：2026-07-07
   场景：Seedance 2.0 native create 连通性修复
   发现内容：Seedance 2.0 上游不接受显式 `service_tier=default`；本地 native canonical data 仍需要保存 `service_tier=default` 以便 get/list 渲染。
   依据来源：远端 `testnapi.token168.ai` 复测返回上游错误消息；本地 `convertToRequestPayload` 回归测试确认上游请求体省略 `service_tier`。

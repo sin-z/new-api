@@ -166,7 +166,7 @@ func setupLogin(user *model.User, c *gin.Context) {
 }
 
 func validateEmailLoginAddress(c *gin.Context, email string) bool {
-	if err := common.Validate.Var(email, "required,email"); err != nil {
+	if err := common.Validate.Var(email, fmt.Sprintf("required,email,max=%d", model.UserNameMaxLength)); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return false
 	}
@@ -201,19 +201,67 @@ func validateEmailLoginAddress(c *gin.Context, email string) bool {
 	return true
 }
 
-func findEnabledUserByEmail(c *gin.Context, email string) (*model.User, bool) {
+func findEmailLoginUserByEmail(email string) (*model.User, error) {
 	var user model.User
 	if err := model.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func loadEmailLoginUser(c *gin.Context, email string) (*model.User, bool, bool) {
+	user, err := findEmailLoginUserByEmail(email)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			common.ApiErrorI18n(c, i18n.MsgUserEmailLoginUserNotFound)
-			return nil, false
+			return nil, false, true
 		}
 		common.SysLog(fmt.Sprintf("Email login database error for email %s: %v", email, err))
 		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
-		return nil, false
+		return nil, false, false
 	}
 	if user.Status != common.UserStatusEnabled {
 		common.ApiErrorI18n(c, i18n.MsgUserDisabled)
+		return nil, true, false
+	}
+	return user, true, true
+}
+
+func ensureEmailLoginRegistrationAllowed(c *gin.Context, email string) bool {
+	if !common.RegisterEnabled {
+		common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
+		return false
+	}
+
+	exist, err := model.CheckUserExistOrDeleted(email, email)
+	if err != nil {
+		common.SysLog(fmt.Sprintf("Email login registration conflict check error for email %s: %v", email, err))
+		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
+		return false
+	}
+	if exist {
+		common.ApiErrorI18n(c, i18n.MsgUserExists)
+		return false
+	}
+	return true
+}
+
+func createEmailLoginRegisteredUser(c *gin.Context, email string) (*model.User, bool) {
+	if !ensureEmailLoginRegistrationAllowed(c, email) {
+		return nil, false
+	}
+
+	// 邮箱验证码自动注册只创建普通启用用户；密码仅作为内部随机凭据，不对用户展示。
+	user := model.User{
+		Username:    email,
+		Password:    common.GetRandomString(32),
+		DisplayName: email,
+		Email:       email,
+		Role:        common.RoleCommonUser,
+		Status:      common.UserStatusEnabled,
+		Group:       "default",
+	}
+	if err := user.Insert(0); err != nil {
+		common.ApiError(c, err)
 		return nil, false
 	}
 	return &user, true
@@ -224,7 +272,9 @@ func SendEmailLoginCode(c *gin.Context) {
 	if !validateEmailLoginAddress(c, email) {
 		return
 	}
-	if _, ok := findEnabledUserByEmail(c, email); !ok {
+	if _, found, ok := loadEmailLoginUser(c, email); !ok {
+		return
+	} else if !found && !ensureEmailLoginRegistrationAllowed(c, email) {
 		return
 	}
 
@@ -258,14 +308,23 @@ func EmailLogin(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
+	if !validateEmailLoginAddress(c, email) {
+		return
+	}
 	if !common.VerifyCodeWithKey(email, code, common.EmailLoginPurpose) {
 		common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
 		return
 	}
 
-	user, ok := findEnabledUserByEmail(c, email)
+	user, found, ok := loadEmailLoginUser(c, email)
 	if !ok {
 		return
+	}
+	if !found {
+		user, ok = createEmailLoginRegisteredUser(c, email)
+		if !ok {
+			return
+		}
 	}
 	common.DeleteKey(email, common.EmailLoginPurpose)
 	setupLogin(user, c)
