@@ -1,10 +1,16 @@
 # Important Findings
 
 - 日期：2026-07-08
+  场景：历史品牌替换 ZZ123
+  发现内容：仓库内历史品牌大小写变体残留扫描无命中；账户邮件模板测试 fixture 已使用 `ZZ123` 和 `https://www.zz123.ai`，历史本地品牌目录路径已改写为 `<workspace>` 占位。
+  依据来源：本轮残留扫描无输出；测试 `go test ./controller -run 'TestSignInCodeEmailUsesEnglishTemplateAndNumericCode|TestEmailVerificationUsesEnglishTemplateAndNumericCode|TestPasswordResetEmailUsesEnglishTemplateAndKeepsResetLink' -count=1 -timeout 60s` 通过；`git diff --check` 通过。
+  适用范围：后续维护账户邮件模板测试、品牌示例域名、计划文档和技术方案历史执行记录。
+
+- 日期：2026-07-08
   场景：账户邮件英文化与邮箱验证码数字化
   发现内容：登录验证码和邮箱验证验证码已改为 `crypto/rand` 生成的 6 位纯数字；密码重置链接 token 和重置后的随机密码仍沿用 `GenerateVerificationCode`，未降级为纯数字。登录验证码、邮箱验证和密码重置邮件主题 / 正文已改为英文，邮件品牌名继续来自 `SystemName`。
   依据来源：源码 `common/verification.go`、`controller/user.go`、`controller/misc.go`；测试 `common/verification_email_login_test.go`、`controller/email_template_test.go`；验证命令 `go test ./common -run 'Test.*Verification|TestSendEmail|TestNewSMTPClient|TestSMTPPlainAuth' -count=1`、`go test ./controller -run 'Test.*Email.*|TestSendEmailLoginCode|TestSendPasswordResetEmail' -count=1`。
-  适用范围：后续维护邮箱验证码、账户邮件模板、SMTP 发信内容和 Token168 品牌名配置。
+  适用范围：后续维护邮箱验证码、账户邮件模板、SMTP 发信内容和 ZZ123 品牌名配置。
 
 - 日期：2026-07-07
   场景：邮箱验证码登录改为注册 / 登录一体化
@@ -21,7 +27,7 @@
 - 日期：2026-07-07
   场景：Seedance 2.0 native create 连通性修复
   发现内容：Seedance 2.0 上游不接受显式 `service_tier=default`；本地 native canonical data 仍需要保存 `service_tier=default` 以便 get/list 渲染。
-  依据来源：远端 `testnapi.token168.ai` 复测返回上游错误消息；本地 `convertToRequestPayload` 回归测试确认上游请求体省略 `service_tier`。
+  依据来源：远端 `testnapi.zz123.ai` 复测返回上游错误消息；本地 `convertToRequestPayload` 回归测试确认上游请求体省略 `service_tier`。
   适用范围：Seedance native create 转 Doubao / VolcEngine / XRToken ARK video 上游请求。
 
 - 日期：2026-07-07
@@ -38,6 +44,6 @@
 
 - 日期：2026-07-07
   场景：本地与远端环境差异
-  发现内容：当前本地 `new-api` 修复后 create/get/list 已通过，但 `https://testnapi.token168.ai` 仍返回旧的 `service_tier` 上游拒绝错误；远端需部署本地修复后再复测成功。
+  发现内容：当前本地 `new-api` 修复后 create/get/list 已通过，但 `https://testnapi.zz123.ai` 仍返回旧的 `service_tier` 上游拒绝错误；远端需部署本地修复后再复测成功。
   依据来源：本地 30169 HTTP 验证 create/get/list 返回 200；远端 2026-07-07 复测 `duration=1` 返回 400 `fail_to_fetch_task` 且消息仍指向 `service_tier`。
   适用范围：Seedance native API 发布验证与测试环境问题判断。

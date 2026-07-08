@@ -25,7 +25,7 @@ Affected:
 Risks:
 - 验证码生成不能继续使用 UUID 前缀，否则可能出现英文字母。
 - 密码重置链接 token 和重置后的随机密码不属于手动输入验证码，不能降级为 6 位数字。
-- 邮件品牌名应继续来自 `SystemName`，避免在代码中硬编码 `Token168`。
+- 邮件品牌名应继续来自 `SystemName`，避免在代码中硬编码 `ZZ123`。
 
 Acceptance:
 - 登录验证码和邮箱验证验证码均为 6 位纯数字。
@@ -48,7 +48,7 @@ Result:
 - `GET /api/user/email_login/code` 登录验证码改为 6 位纯数字，邮件主题和正文改为英文。
 - `GET /api/verification` 邮箱验证验证码改为 6 位纯数字，邮件主题和正文改为英文。
 - `GET /api/user/reset` 密码重置邮件主题和正文改为英文，重置链接 token 继续使用现有长随机串。
-- 邮件品牌名继续使用 `common.SystemName`，不硬编码 `Token168`。
+- 邮件品牌名继续使用 `common.SystemName`，不硬编码 `ZZ123`。
 
 Verification:
 - TDD 红灯：`go test ./common -run TestGenerateNumericVerificationCodeReturnsDigitsOnly -count=1` 失败于 `undefined: GenerateNumericVerificationCode`。
@@ -64,7 +64,7 @@ SelfReview:
 - 事实依据 / 证据充分性检查：用户确认范围、源码 diff 和上述测试命令可验证。
 - 变更边界完整性检查：改动限定在账户邮件模板、邮箱验证码生成、相关测试和过程文档。
 - 负向关联影响检查：密码重置 token 与重置后随机密码仍使用 `GenerateVerificationCode`，未降级为纯数字。
-- 上下游依赖检查：HTTP API、请求字段、响应结构、验证码有效期和校验逻辑未变；运行环境仍需将 `SystemName` 配置为 `Token168` 才会显示 Token168 品牌名。
+- 上下游依赖检查：HTTP API、请求字段、响应结构、验证码有效期和校验逻辑未变；运行环境仍需将 `SystemName` 配置为 `ZZ123` 才会显示 ZZ123 品牌名。
 - 新增风险 / 问题 / 矛盾点 / 模糊项 / 重叠项检查：6 位数字验证码空间较 UUID 前缀更小，但符合用户手动输入体验；现有接口限流策略未在本次范围内调整。
 - 问题处置状态检查：未发现未闭环问题。
 

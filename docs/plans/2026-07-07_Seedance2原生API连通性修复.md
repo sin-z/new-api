@@ -12,7 +12,7 @@ Scope:
 - 补齐 Seedance native create 的 `duration` 入参校验，拒绝上游不接受的过短时长。
 - 修复 Doubao task 上游响应中 `created_at` / `updated_at` 可能返回 RFC3339 字符串导致本地反序列化失败的问题。
 - 使用本地 `new-api` 服务复测 `/api/v3/contents/generations/tasks` create / get / list 主链路。
-- 远端 `testnapi.token168.ai` 仅在代码部署到该环境后才能体现本地修复；本计划记录远端复测事实，不把未部署的本地修改写成远端已生效。
+- 远端 `testnapi.zz123.ai` 仅在代码部署到该环境后才能体现本地修复；本计划记录远端复测事实，不把未部署的本地修改写成远端已生效。
 
 Affected:
 
@@ -67,7 +67,7 @@ Verification:
   - 本地 `GET /api/v3/contents/generations/tasks/{task_id}`：返回 200，包含 public task id、`status=queued`、`ratio=16:9`、`duration=4`、`service_tier=default`。
   - 本地 `GET /api/v3/contents/generations/tasks?page_num=1&page_size=5`：返回 200，列表包含刚创建的 public task id。
 - 远端复测事实：
-  - 对 `https://testnapi.token168.ai/api/v3/contents/generations/tasks` 使用 `duration=1` 复测，返回 400，错误码 `fail_to_fetch_task`，错误消息仍为上游拒绝 `service_tier`。
+  - 对 `https://testnapi.zz123.ai/api/v3/contents/generations/tasks` 使用 `duration=1` 复测，返回 400，错误码 `fail_to_fetch_task`，错误消息仍为上游拒绝 `service_tier`。
   - 结论：远端当前行为仍是旧错误；本地修复尚未在该远端环境体现。
 - 其他验证：
   - `go vet ./common ./controller ./router ./relay/channel/task/doubao ./relay/channel/task/xrtokenarkvideo` 未作为通过项，原因是 `./common` 中存在既有 vet 问题：`common/custom-event.go` 复制 `sync.Mutex`、`common/email_test.go` IPv6 地址格式；这些文件本次未修改。
@@ -88,7 +88,7 @@ Self Review:
   - Seedance 2.0 `duration=1` 请求继续打上游：`已修复`。
   - RFC3339 `created_at` / `updated_at` 反序列化失败：`已修复`。
   - XRToken/ARK video native create 响应与 Task.Data 格式不一致：`已修复`。
-  - 远端 `testnapi.token168.ai` 仍返回旧错误：`待部署验证`。
+  - 远端 `testnapi.zz123.ai` 仍返回旧错误：`待部署验证`。
 
 Rollback:
 

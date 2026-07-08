@@ -95,7 +95,7 @@
   - `go vet ./model ./service ./relay/channel/task/xrtokenarkvideo ./relay/channel/task/doubao ./relay` 通过。
   - `git diff --check` 无输出。
   - `git diff --check -- memories/important-findings.md` 无输出。
-  - `python3 /Users/ai/workbench/projects/token168/harness-engineering/tools/tech_design_sql_lint.py docs/tech-design/xrtoken-ark-video-task-adaptor.md` 输出 `no SQL DDL blocks found`。
+  - `python3 <workspace>/harness-engineering/tools/tech_design_sql_lint.py docs/tech-design/xrtoken-ark-video-task-adaptor.md` 输出 `no SQL DDL blocks found`。
   - `python3 harness-engineering/tools/harness_env.py doctor --profile bootstrap` 输出 `bootstrap: pass`。
   - `codegraph sync && codegraph status` 显示本 worktree index up to date。
   - `bun run format:check` / `bun run lint` 未执行成功：当前环境无 `bun`；改用 `npm run format:check` / `npm run lint` 复核时，default 因缺 `oxfmt`、classic 因缺 `prettier` 失败，未安装依赖以避免扩大环境变更。

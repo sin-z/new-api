@@ -145,10 +145,10 @@ func setupEmailTemplateTestRouter(t *testing.T) (*gin.Engine, *capturedEmailSMTP
 	oldRegisterEnabled := common.RegisterEnabled
 	oldRedisEnabled := common.RedisEnabled
 	oldServerAddress := system_setting.ServerAddress
-	common.SystemName = "Token168"
+	common.SystemName = "ZZ123"
 	common.RegisterEnabled = true
 	common.RedisEnabled = false
-	system_setting.ServerAddress = "https://www.token168.ai"
+	system_setting.ServerAddress = "https://www.zz123.ai"
 	t.Cleanup(func() {
 		common.SystemName = oldSystemName
 		common.RegisterEnabled = oldRegisterEnabled
@@ -206,8 +206,8 @@ func TestSignInCodeEmailUsesEnglishTemplateAndNumericCode(t *testing.T) {
 	requireSuccessfulGet(t, router, "/api/user/email_login/code?email=signin@example.com")
 
 	subject, body := readCapturedEmail(t, server)
-	require.Equal(t, "Token168 sign-in code", subject)
-	require.Contains(t, body, "You are signing in to Token168.")
+	require.Equal(t, "ZZ123 sign-in code", subject)
+	require.Contains(t, body, "You are signing in to ZZ123.")
 	require.Contains(t, body, "This code expires in 10 minutes.")
 	requireEmailCode(t, body)
 }
@@ -218,8 +218,8 @@ func TestEmailVerificationUsesEnglishTemplateAndNumericCode(t *testing.T) {
 	requireSuccessfulGet(t, router, "/api/verification?email=verify@example.com")
 
 	subject, body := readCapturedEmail(t, server)
-	require.Equal(t, "Token168 email verification code", subject)
-	require.Contains(t, body, "You are verifying your email address for Token168.")
+	require.Equal(t, "ZZ123 email verification code", subject)
+	require.Contains(t, body, "You are verifying your email address for ZZ123.")
 	require.Contains(t, body, "This code expires in 10 minutes.")
 	requireEmailCode(t, body)
 }
@@ -234,9 +234,9 @@ func TestPasswordResetEmailUsesEnglishTemplateAndKeepsResetLink(t *testing.T) {
 	requireSuccessfulGet(t, router, "/api/user/reset?email=reset@example.com")
 
 	subject, body := readCapturedEmail(t, server)
-	require.Equal(t, "Token168 password reset", subject)
-	require.Contains(t, body, "You requested a password reset for Token168.")
-	require.Contains(t, body, "Click <a href='https://www.token168.ai/user/reset?email=reset@example.com&token=")
+	require.Equal(t, "ZZ123 password reset", subject)
+	require.Contains(t, body, "You requested a password reset for ZZ123.")
+	require.Contains(t, body, "Click <a href='https://www.zz123.ai/user/reset?email=reset@example.com&token=")
 	require.Contains(t, body, "This reset link expires in 10 minutes.")
 	require.NotContains(t, body, "密码")
 }

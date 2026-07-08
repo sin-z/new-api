@@ -147,7 +147,7 @@
 ### Base URL 与协议定位
 
 - Base path: `/api/v3/contents/generations`
-- 协议目标：调用方使用 token168 服务域名替换 BytePlus / ModelArk 域名，path、字段、状态和错误语义按 BytePlus native 心智对齐。
+- 协议目标：调用方使用 ZZ123 服务域名替换 BytePlus / ModelArk 域名，path、字段、状态和错误语义按 BytePlus native 心智对齐。
 - 响应不得使用 OpenAI Video wrapper，不得使用 `/api` dashboard `{success,message,data}` envelope。
 
 ### 鉴权
@@ -525,7 +525,7 @@ API Key `Authorization: Bearer <api_key>`。
 
 - list 只返回 Seedance native 可渲染任务；未接入 BytePlus native task adaptor 能力的 channel type 不进入 native list 结果。
 - list 不返回其他用户任务，不暴露 channel id、upstream task id、provider key 或内部计费上下文。
-- Custom API key 下 `filter.model` 是否必填必须在 C1 / owner 验证中确认；未确认前不作为 token168 P0 必填。
+- Custom API key 下 `filter.model` 是否必填必须在 C1 / owner 验证中确认；未确认前不作为 ZZ123 P0 必填。
 
 ## 依赖与约束
 
