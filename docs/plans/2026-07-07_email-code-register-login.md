@@ -55,6 +55,13 @@ Verification:
 - `go test ./model -run User -count=1`：通过。
 - `git diff --check`：通过。
 - `go test ./... -run '^$'`：根包因仓内缺 `web/classic/dist` 和 `web/default/dist` 编译失败；其他已枚举包空跑通过。该阻塞与本次改动无关，已用 `controller` loopback HTTP 测试覆盖本次接口行为。
+- 运行配置诊断补充：`go test ./common -run 'TestSendEmail|TestNewSMTPClient|TestSMTPPlainAuth' -count=1` 通过；`go test ./controller -run 'TestSendEmailLoginCode' -count=1` 通过。
+
+RuntimeDiagnosis:
+- 用户反馈 `535 5.7.0 Invalid login or password[not exist in redis]` 后，已只读核对发码路径：`GET /api/user/email_login/code` 先注册内存验证码，再调用 `common.SendEmail`；SMTP 认证失败会经 `common.ApiError` 原样返回给前端。
+- `REDIS_CONN_STRING` 未配置时 `common.InitRedisClient` 会设置 `RedisEnabled=false` 并返回 nil，不是发码接口的直接失败原因。
+- 当前验证码实现使用进程内 `verificationMap`，不读写 Redis；单实例可工作，多实例或无状态部署存在验证码不共享风险。
+- `535 5.7.0 Invalid login or password` 的直接处置项是校验系统设置中的 `SMTPServer`、`SMTPPort`、`SMTPAccount`、`SMTPFrom`、`SMTPToken`、`SMTPSSLEnabled`、`SMTPStartTLSEnabled`、`SMTPForceAuthLogin`，并使用邮件服务要求的授权码或应用专用密码。
 
 SelfReview:
 - 结论：`通过`

@@ -1,10 +1,22 @@
 # Important Findings
 
+- 日期：2026-07-08
+  场景：账户邮件英文化与邮箱验证码数字化
+  发现内容：登录验证码和邮箱验证验证码已改为 `crypto/rand` 生成的 6 位纯数字；密码重置链接 token 和重置后的随机密码仍沿用 `GenerateVerificationCode`，未降级为纯数字。登录验证码、邮箱验证和密码重置邮件主题 / 正文已改为英文，邮件品牌名继续来自 `SystemName`。
+  依据来源：源码 `common/verification.go`、`controller/user.go`、`controller/misc.go`；测试 `common/verification_email_login_test.go`、`controller/email_template_test.go`；验证命令 `go test ./common -run 'Test.*Verification|TestSendEmail|TestNewSMTPClient|TestSMTPPlainAuth' -count=1`、`go test ./controller -run 'Test.*Email.*|TestSendEmailLoginCode|TestSendPasswordResetEmail' -count=1`。
+  适用范围：后续维护邮箱验证码、账户邮件模板、SMTP 发信内容和 Token168 品牌名配置。
+
 - 日期：2026-07-07
   场景：邮箱验证码登录改为注册 / 登录一体化
   发现内容：`new-api` 的 `GET /api/user/email_login/code` 已支持未注册邮箱在 `RegisterEnabled=true` 且邮箱 / 同名 username 未被现有或软删除账号占用时发码，但发码阶段不创建用户；`POST /api/user/email_login` 在邮箱登录验证码校验成功后才自动创建普通启用用户并登录，自动创建用户的 `username`、`email`、`display_name` 均为完整邮箱，内部密码随机生成且不受 `PasswordRegisterEnabled` 约束。邮箱验证码 purpose 继续与注册验证码 purpose 隔离。
   依据来源：源码 `controller/user.go`、`model/user.go`、`docs/api_contract.md`；测试 `controller/email_login_test.go`、`common/verification_email_login_test.go`；验证命令 `go test ./controller -run 'Test.*EmailLogin' -count=1`、`go test ./common -run TestEmailLoginPurposeIsIsolatedFromRegistrationPurpose -count=1`、`go test ./model -run User -count=1`。
   适用范围：后续维护邮箱验证码登录、注册开关、无密码邮箱注册、用户模型长度、Console 登录文案和接口契约。
+
+- 日期：2026-07-07
+  场景：邮箱验证码登录发码运行配置诊断
+  发现内容：`535 5.7.0 Invalid login or password` 是 `common.SendEmail` 调用 SMTP 认证时返回并由 `common.ApiError` 原样透出的错误；`REDIS_CONN_STRING` 未配置只会让 `InitRedisClient` 设置 `RedisEnabled=false` 并返回 nil，不是该 SMTP 认证失败的直接原因。当前邮箱验证码存储使用进程内 `verificationMap`，不读写 Redis；单实例可工作，多实例或无状态部署存在验证码不共享风险。
+  依据来源：源码 `controller/user.go`、`common/email.go`、`common/redis.go`、`common/verification.go`、`model/option.go`；验证命令 `go test ./common -run 'TestSendEmail|TestNewSMTPClient|TestSMTPPlainAuth' -count=1`、`go test ./controller -run 'TestSendEmailLoginCode' -count=1`。
+  适用范围：后续排查邮箱验证码发码失败、SMTP 配置、Redis 配置、多实例验证码一致性问题。
 
 - 日期：2026-07-07
   场景：Seedance 2.0 native create 连通性修复

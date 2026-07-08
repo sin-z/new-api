@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-07-08
+
+- 将登录验证码、邮箱验证和密码重置三类账户邮件主题 / 正文改为英文；邮件品牌名继续来自 `SystemName`，不在代码中硬编码 `Token168`。
+- 新增纯数字邮箱验证码生成能力，登录验证码和邮箱验证验证码改为 6 位数字；密码重置链接 token 和重置后随机密码继续使用原长随机串生成方式。
+- 新增 SMTP 邮件内容测试，覆盖英文主题 / 正文、6 位数字验证码和密码重置链接保留。
+
 ## 2026-07-07
 
 - 将 `GET /api/user/email_login/code` 扩展为邮箱登录 / 注册验证码发送：已存在启用用户沿用登录验证码；未注册邮箱在 `RegisterEnabled=true` 且未被现有或软删除账号占用时允许发码，发送阶段不创建用户。
@@ -7,6 +13,7 @@
 - 放宽 `UserNameMaxLength`、`User.Username`、`User.DisplayName`、`User.Email` 校验上限到 254，并在邮箱验证码登录地址校验中拒绝超过 254 字符的邮箱。
 - 补齐 `controller/email_login_test.go` 测试夹具的 `LOG_DB`、`logs` 表、Redis 关闭和 fake SMTP，新增用例覆盖未注册发码不建用户、自动注册登录、loopback HTTP 登录、注册关闭、已存在用户不重复创建、禁用 / 软删除 / username 冲突、254/255 长度边界。
 - 更新 `docs/api_contract.md` 邮箱验证码登录契约，移除“必须属于现有用户 / 不自动注册不存在邮箱”的旧口径。
+- 补充邮箱登录运行配置诊断留痕：确认 `535 5.7.0 Invalid login or password` 来自 SMTP 认证失败链路，`REDIS_CONN_STRING` 缺失只会禁用 Redis 缓存，不是本次发码失败的直接原因。
 
 ## 2026-07-06
 

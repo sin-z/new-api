@@ -278,12 +278,13 @@ func SendEmailLoginCode(c *gin.Context) {
 		return
 	}
 
-	code := common.GenerateVerificationCode(6)
+	code := common.GenerateNumericVerificationCode(6)
 	common.RegisterVerificationCodeWithKey(email, code, common.EmailLoginPurpose)
-	subject := fmt.Sprintf("%s邮箱登录验证码", common.SystemName)
-	content := fmt.Sprintf("<p>您好，你正在登录%s。</p>"+
-		"<p>您的验证码为: <strong>%s</strong></p>"+
-		"<p>验证码 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, code, common.VerificationValidMinutes)
+	subject := fmt.Sprintf("%s sign-in code", common.SystemName)
+	content := fmt.Sprintf("<p>You are signing in to %s.</p>"+
+		"<p>Your verification code is: <strong>%s</strong></p>"+
+		"<p>This code expires in %d minutes.</p>"+
+		"<p>If you did not request this, you can safely ignore this email.</p>", common.SystemName, code, common.VerificationValidMinutes)
 	if err := common.SendEmail(subject, email, content); err != nil {
 		common.ApiError(c, err)
 		return
