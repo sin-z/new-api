@@ -1,6 +1,12 @@
 # Important Findings
 
 - 日期：2026-07-08
+  场景：修复 Seedance native 编译错误
+  发现内容：`types.PriceData.OtherRatios` 已在 `fc1259f5 refactor(price): improve handling of other ratios in PriceData` 中由导出字段改为私有 `otherRatios` 加 `OtherRatios()` 快照方法；`controller/relay.go` 已同步改为方法调用，`controller/seedance_native.go` 漏改会导致 `go test ./controller` 和根包 `go build` 编译失败。修复后 Go 代码中不再存在 `PriceData.OtherRatios` 非方法调用。
+  依据来源：源码 `types/price_data.go`、`controller/relay.go`、`controller/seedance_native.go`；提交 `fc1259f5`；验证命令 `go test ./controller -count=1 -timeout=60s`、`go build -o /tmp/token168-new-api-build-check .`、`rg -n "PriceData\\.OtherRatios(?!\\()" --pcre2 --glob '*.go' .`。
+  适用范围：后续维护 `types.PriceData` 附加倍率快照、Seedance native 任务落库计费上下文、异步 task billing 计费重算。
+
+- 日期：2026-07-08
   场景：历史品牌替换 ZZ123
   发现内容：仓库内历史品牌大小写变体残留扫描无命中；账户邮件模板测试 fixture 已使用 `ZZ123` 和 `https://www.zz123.ai`，历史本地品牌目录路径已改写为 `<workspace>` 占位。
   依据来源：本轮残留扫描无输出；测试 `go test ./controller -run 'TestSignInCodeEmailUsesEnglishTemplateAndNumericCode|TestEmailVerificationUsesEnglishTemplateAndNumericCode|TestPasswordResetEmailUsesEnglishTemplateAndKeepsResetLink' -count=1 -timeout 60s` 通过；`git diff --check` 通过。
