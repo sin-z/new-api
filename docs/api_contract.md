@@ -406,13 +406,14 @@ API Key `Authorization: Bearer <api_key>`。
 | resolution | string | no | 分辨率 | 来自请求快照或上游 |
 | ratio | string | no | 画幅比例 | 来自请求快照或上游 |
 | duration | integer | no | 视频时长 | 来自请求快照或上游 |
+| framespersecond | integer | no | 视频帧率 | 上游返回时出现 |
 | generate_audio | boolean | no | 是否生成音频 | 来自请求快照或上游 |
-| priority | integer | no | 优先级 | 来自请求快照或上游 |
+| priority | integer | no | 优先级 | 来自请求快照或上游；为 `0` 时按零值省略 |
 | service_tier | string | no | 服务层级 | 若返回只能为 `default` |
 | execution_expires_after | integer | no | 任务过期秒数 | 来自请求快照或上游 |
 | usage.completion_tokens | integer | no | 输出 token 数 | 成功或上游返回 usage 时出现 |
 | usage.total_tokens | integer | no | 总 token 数 | 成功或上游返回 usage 时出现 |
-| draft | boolean | no | draft 标记 | C2 未补证前不作为 Seedance 2.0 必返 |
+| draft | boolean | no | draft 标记 | 上游返回且为 `true` 时出现；`false` 按零值省略 |
 | draft_task_id | string | no | draft task id | C2 未补证前不作为 Seedance 2.0 必返 |
 
 ### 示例响应
@@ -426,16 +427,20 @@ API Key `Authorization: Bearer <api_key>`。
   "created_at": 1710000000,
   "updated_at": 1710000100,
   "content": {
-    "video_url": "https://example.com/video.mp4"
+    "video_url": "https://example.com/video.mp4",
+    "last_frame_url": "https://example.com/last-frame.png"
   },
-  "resolution": "1080p",
+  "seed": 78674,
+  "resolution": "720p",
   "ratio": "16:9",
   "duration": 5,
+  "framespersecond": 24,
   "generate_audio": true,
   "service_tier": "default",
+  "execution_expires_after": 172800,
   "usage": {
-    "completion_tokens": 1000,
-    "total_tokens": 1000
+    "completion_tokens": 108900,
+    "total_tokens": 108900
   }
 }
 ```

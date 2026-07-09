@@ -73,7 +73,9 @@ type seedanceNativeTaskResponse struct {
 	Resolution            string                      `json:"resolution,omitempty"`
 	Ratio                 string                      `json:"ratio,omitempty"`
 	Duration              int                         `json:"duration,omitempty"`
+	FramesPerSecond       int                         `json:"framespersecond,omitempty"`
 	GenerateAudio         *bool                       `json:"generate_audio,omitempty"`
+	Draft                 bool                        `json:"draft,omitempty"`
 	Priority              int                         `json:"priority,omitempty"`
 	ServiceTier           string                      `json:"service_tier,omitempty"`
 	ExecutionExpiresAfter int                         `json:"execution_expires_after,omitempty"`
@@ -120,10 +122,13 @@ type seedanceCanonicalTaskData struct {
 	Resolution            string                     `json:"resolution"`
 	Ratio                 string                     `json:"ratio"`
 	Duration              int                        `json:"duration"`
+	FramesPerSecond       int                        `json:"framespersecond,omitempty"`
 	GenerateAudio         *bool                      `json:"generate_audio"`
+	Draft                 bool                       `json:"draft,omitempty"`
 	ExecutionExpiresAfter int                        `json:"execution_expires_after"`
 	Priority              int                        `json:"priority"`
 	VideoURL              string                     `json:"video_url"`
+	LastFrameURL          string                     `json:"last_frame_url,omitempty"`
 }
 
 type seedanceNativeTaskListResponse struct {
@@ -642,18 +647,20 @@ func BuildSeedanceNativeTaskResponse(task *model.Task) (*seedanceNativeTaskRespo
 		updatedAt = data.UpdatedAt.Unix()
 	}
 	resp := &seedanceNativeTaskResponse{
-		ID:            task.TaskID,
-		Model:         modelName,
-		Status:        toSeedanceNativeStatus(task.Status),
-		CreatedAt:     createdAt,
-		UpdatedAt:     updatedAt,
-		Content:       data.Content,
-		Seed:          data.Seed,
-		Resolution:    data.Request.Resolution,
-		Ratio:         data.Request.Ratio,
-		Duration:      data.Request.Duration,
-		GenerateAudio: data.Request.GenerateAudio,
-		ServiceTier:   data.ServiceTier,
+		ID:              task.TaskID,
+		Model:           modelName,
+		Status:          toSeedanceNativeStatus(task.Status),
+		CreatedAt:       createdAt,
+		UpdatedAt:       updatedAt,
+		Content:         data.Content,
+		Seed:            data.Seed,
+		Resolution:      data.Request.Resolution,
+		Ratio:           data.Request.Ratio,
+		Duration:        data.Request.Duration,
+		FramesPerSecond: data.FramesPerSecond,
+		GenerateAudio:   data.Request.GenerateAudio,
+		Draft:           data.Draft,
+		ServiceTier:     data.ServiceTier,
 		Usage: &seedanceNativeTaskUsage{
 			CompletionTokens: data.Usage.CompletionTokens,
 			TotalTokens:      data.Usage.TotalTokens,
@@ -688,6 +695,9 @@ func BuildSeedanceNativeTaskResponse(task *model.Task) (*seedanceNativeTaskRespo
 	}
 	if resp.Content.VideoURL == "" {
 		resp.Content.VideoURL = data.VideoURL
+	}
+	if resp.Content.LastFrameURL == "" {
+		resp.Content.LastFrameURL = data.LastFrameURL
 	}
 	if resp.Content.VideoURL == "" {
 		resp.Content.VideoURL = task.GetResultURL()

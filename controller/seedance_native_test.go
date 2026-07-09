@@ -161,6 +161,22 @@ func TestBuildSeedanceNativeTaskResponseUsesPublicIDAndCanonicalData(t *testing.
 	}
 }
 
+func TestSeedanceCanonicalTaskDataOmitsEmptyNativeFields(t *testing.T) {
+	t.Parallel()
+
+	data := seedanceCanonicalTaskData{
+		ID:     "upstream_task_123",
+		Model:  "doubao-seedance-2-0-260128",
+		Status: "queued",
+	}
+
+	body, err := json.Marshal(data)
+	require.NoError(t, err)
+	require.NotContains(t, string(body), `"framespersecond"`)
+	require.NotContains(t, string(body), `"draft"`)
+	require.NotContains(t, string(body), `"last_frame_url"`)
+}
+
 func TestRenderSeedanceTaskNotFoundUsesNativeErrorShell(t *testing.T) {
 	t.Parallel()
 
@@ -301,6 +317,97 @@ func TestSeedanceNativeTaskGetReadsXRTokenTopLevelVideoURL(t *testing.T) {
 	require.Equal(t, "https://cdn.example.com/xrtoken.mp4", resp.Content.VideoURL)
 	require.EqualValues(t, 1783392014, resp.CreatedAt)
 	require.EqualValues(t, 1783392074, resp.UpdatedAt)
+}
+
+func TestSeedanceNativeTaskGetRendersXRTokenUsageAndNativeFields(t *testing.T) {
+	setupSeedanceNativeControllerTestDB(t)
+	insertSeedanceNativeControllerTask(t, &model.Task{
+		TaskID:     "task_public_123",
+		UserId:     10,
+		Platform:   constant.TaskPlatform("101"),
+		Status:     model.TaskStatusSuccess,
+		SubmitTime: time.Now().Unix(),
+		Properties: model.Properties{
+			OriginModelName: "doubao-seedance-2-0-260128",
+		},
+		PrivateData: model.TaskPrivateData{
+			UpstreamTaskID: "upstream_task_123",
+		},
+		Data: []byte(`{
+			"id":"upstream_task_123",
+			"model":"volcengine/doubao-seedance-2-0-260128",
+			"status":"succeeded",
+			"video_url":"https://cdn.example.com/xrtoken.mp4",
+			"last_frame_url":"https://cdn.example.com/last-frame.png",
+			"usage":{"completion_tokens":108900,"total_tokens":108900},
+			"created_at":1779348818,
+			"updated_at":1779348874,
+			"seed":78674,
+			"resolution":"720p",
+			"ratio":"16:9",
+			"duration":5,
+			"framespersecond":24,
+			"service_tier":"default",
+			"execution_expires_after":172800,
+			"generate_audio":true,
+			"draft":false,
+			"priority":0
+		}`),
+	})
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v3/contents/generations/tasks/task_public_123", nil)
+	ctx.Params = gin.Params{{Key: "task_id", Value: "task_public_123"}}
+	ctx.Set("id", 10)
+
+	SeedanceNativeTaskGet(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.NotContains(t, recorder.Body.String(), "upstream_task_123")
+	var resp struct {
+		ID      string `json:"id"`
+		Model   string `json:"model"`
+		Status  string `json:"status"`
+		Content struct {
+			VideoURL     string `json:"video_url"`
+			LastFrameURL string `json:"last_frame_url"`
+		} `json:"content"`
+		Usage struct {
+			CompletionTokens int `json:"completion_tokens"`
+			TotalTokens      int `json:"total_tokens"`
+		} `json:"usage"`
+		CreatedAt             int64  `json:"created_at"`
+		UpdatedAt             int64  `json:"updated_at"`
+		Seed                  int    `json:"seed"`
+		Resolution            string `json:"resolution"`
+		Ratio                 string `json:"ratio"`
+		Duration              int    `json:"duration"`
+		FramesPerSecond       int    `json:"framespersecond"`
+		ServiceTier           string `json:"service_tier"`
+		ExecutionExpiresAfter int    `json:"execution_expires_after"`
+		GenerateAudio         bool   `json:"generate_audio"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
+	require.Equal(t, "task_public_123", resp.ID)
+	require.Equal(t, "doubao-seedance-2-0-260128", resp.Model)
+	require.Equal(t, "succeeded", resp.Status)
+	require.Equal(t, "https://cdn.example.com/xrtoken.mp4", resp.Content.VideoURL)
+	require.Equal(t, "https://cdn.example.com/last-frame.png", resp.Content.LastFrameURL)
+	require.Equal(t, 108900, resp.Usage.CompletionTokens)
+	require.Equal(t, 108900, resp.Usage.TotalTokens)
+	require.EqualValues(t, 1779348818, resp.CreatedAt)
+	require.EqualValues(t, 1779348874, resp.UpdatedAt)
+	require.Equal(t, 78674, resp.Seed)
+	require.Equal(t, "720p", resp.Resolution)
+	require.Equal(t, "16:9", resp.Ratio)
+	require.Equal(t, 5, resp.Duration)
+	require.Equal(t, 24, resp.FramesPerSecond)
+	require.Equal(t, "default", resp.ServiceTier)
+	require.Equal(t, 172800, resp.ExecutionExpiresAfter)
+	require.True(t, resp.GenerateAudio)
+	require.NotContains(t, recorder.Body.String(), `"draft"`)
+	require.NotContains(t, recorder.Body.String(), `"priority"`)
 }
 
 func TestSeedanceNativeTaskGetHidesOtherUsersAndUnsupportedChannels(t *testing.T) {

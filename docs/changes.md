@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-07-09
+
+- 将 XRTokenArkVideo 任务查询接口从 `/v1/contents/generations/tasks/{task_id}` 切换到 `/v1/videos/generations/{task_id}`，创建接口保持不变。
+- XRTokenArkVideo 任务查询成功时解析上游 `usage.completion_tokens` / `usage.total_tokens` 并写入 `TaskInfo`，用于任务完成后的 token 口径结算与使用日志。
+- XRTokenArkVideo 结果 URL 兼容顶层 `video_url` 与 `content.video_url`，OpenAI Video wrapper 和 Seedance native 查询均可读取。
+- Seedance native task 响应补充 XRToken 查询返回中的 `last_frame_url`、`framespersecond`、`draft`、`priority` 等字段映射；`draft=false` 与 `priority=0` 均按零值省略。
+- 更新 Seedance native GET 契约示例和字段表，补齐 `framespersecond`、`usage` 与 XRToken 返回字段说明。
+
 ## 2026-07-08
 
 - 修复 Seedance native 任务落库计费上下文中的 `PriceData.OtherRatios` 旧字段访问，改为调用 `OtherRatios()` 快照方法；`go test ./controller` 与根包 `go build` 不再因该类型错误失败。
