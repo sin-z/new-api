@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -26,17 +27,42 @@ type responsePayload struct {
 }
 
 type responseTask struct {
-	ID        string                  `json:"id"`
-	Model     string                  `json:"model"`
-	Status    string                  `json:"status"`
-	VideoURL  string                  `json:"video_url"`
-	Duration  any                     `json:"duration,omitempty"`
-	CreatedAt common.FlexibleUnixTime `json:"created_at"`
-	UpdatedAt common.FlexibleUnixTime `json:"updated_at"`
-	Error     struct {
+	ID      string `json:"id"`
+	Model   string `json:"model"`
+	Status  string `json:"status"`
+	Content struct {
+		VideoURL     string `json:"video_url,omitempty"`
+		LastFrameURL string `json:"last_frame_url,omitempty"`
+	} `json:"content,omitempty"`
+	VideoURL              string                  `json:"video_url"`
+	LastFrameURL          string                  `json:"last_frame_url,omitempty"`
+	Duration              any                     `json:"duration,omitempty"`
+	CreatedAt             common.FlexibleUnixTime `json:"created_at"`
+	UpdatedAt             common.FlexibleUnixTime `json:"updated_at"`
+	Seed                  int                     `json:"seed,omitempty"`
+	Resolution            string                  `json:"resolution,omitempty"`
+	Ratio                 string                  `json:"ratio,omitempty"`
+	FramesPerSecond       int                     `json:"framespersecond,omitempty"`
+	ServiceTier           string                  `json:"service_tier,omitempty"`
+	ExecutionExpiresAfter int                     `json:"execution_expires_after,omitempty"`
+	GenerateAudio         bool                    `json:"generate_audio,omitempty"`
+	Draft                 bool                    `json:"draft,omitempty"`
+	Priority              int                     `json:"priority,omitempty"`
+	Usage                 struct {
+		CompletionTokens int `json:"completion_tokens,omitempty"`
+		TotalTokens      int `json:"total_tokens,omitempty"`
+	} `json:"usage,omitempty"`
+	Error struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
 	} `json:"error"`
+}
+
+func (r responseTask) resultVideoURL() string {
+	if r.Content.VideoURL != "" {
+		return r.Content.VideoURL
+	}
+	return r.VideoURL
 }
 
 // TaskAdaptor 适配 XRToken ARK 视频任务协议。
@@ -131,14 +157,14 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 	return xResp.ID, responseBody, nil
 }
 
-// FetchTask 从 XRToken /v1 任务端点查询上游任务状态。
+// FetchTask 从 XRToken 视频生成查询端点查询上游任务状态。
 func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy string) (*http.Response, error) {
 	taskID, ok := body["task_id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("invalid task_id")
 	}
 
-	uri := fmt.Sprintf("%s/v1/contents/generations/tasks/%s", baseUrl, taskID)
+	uri := fmt.Sprintf("%s/v1/videos/generations/%s", baseUrl, url.PathEscape(taskID))
 	req, err := http.NewRequest(http.MethodGet, uri, nil)
 	if err != nil {
 		return nil, err
@@ -166,7 +192,7 @@ func (a *TaskAdaptor) GetChannelName() string {
 }
 
 // ParseTaskResult 将 XRToken 查询响应映射为统一任务状态。
-// 成功状态只读取顶层 video_url，避免复用 Doubao 的 content.video_url 结构。
+// 查询接口可能返回顶层 video_url，也可能返回 Seedance native content.video_url，两者都兼容。
 func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, error) {
 	resTask := responseTask{}
 	if err := common.Unmarshal(respBody, &resTask); err != nil {
@@ -187,7 +213,9 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case "succeeded", "completed":
 		taskResult.Status = model.TaskStatusSuccess
 		taskResult.Progress = "100%"
-		taskResult.Url = resTask.VideoURL
+		taskResult.Url = resTask.resultVideoURL()
+		taskResult.CompletionTokens = resTask.Usage.CompletionTokens
+		taskResult.TotalTokens = resTask.Usage.TotalTokens
 	case "failed":
 		taskResult.Status = model.TaskStatusFailure
 		taskResult.Progress = "100%"
@@ -213,7 +241,7 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 	openAIVideo.TaskID = originTask.TaskID
 	openAIVideo.Status = originTask.Status.ToVideoStatus()
 	openAIVideo.SetProgressStr(originTask.Progress)
-	resultURL := xResp.VideoURL
+	resultURL := xResp.resultVideoURL()
 	if resultURL == "" {
 		// 轮询成功但上游未返回 video_url 时，任务结果会落到代理 URL。
 		resultURL = originTask.GetResultURL()

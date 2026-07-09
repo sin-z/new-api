@@ -2,6 +2,7 @@
 
 | Date | Task | Status | Plan | OverallPlan | ScopeSummary |
 | --- | --- | --- | --- | --- | --- |
+| 2026-07-09 | XRToken 视频任务查询协议适配 | `completed` | `docs/plans/2026-07-09_XRToken视频任务查询协议适配.md` | `docs/plans/2026-07-09_XRToken视频任务查询协议适配.md` | 将 XRTokenArkVideo 任务查询切到 `/v1/videos/generations/{task_id}`，并把上游 usage 与 Seedance native 字段映射到现有 public task 查询响应。 |
 | 2026-07-08 | 修复 Seedance Native OtherRatios 编译错误 | `completed` | `docs/plans/2026-07-08_修复SeedanceNativeOtherRatios编译错误.md` | `docs/plans/2026-07-08_修复SeedanceNativeOtherRatios编译错误.md` | 将 Seedance native 任务计费快照中的 `PriceData.OtherRatios` 旧字段访问改为 `OtherRatios()` 方法调用，修复 controller 与根包编译失败。 |
 | 2026-07-08 | 历史品牌替换 ZZ123 | `completed` | `docs/plans/2026-07-08-历史品牌替换ZZ123.md` | `docs/plans/2026-07-08-历史品牌替换ZZ123.md` | 将仓库内历史品牌文案、测试 fixture 和域名示例替换为 `ZZ123` / `zz123.ai`，并将历史本地品牌目录路径改写为 `<workspace>` 占位。 |
 | 2026-07-08 | 邮件英文化与纯数字验证码 | `completed` | `docs/plans/2026-07-08_email-template-english-numeric-code.md` | `docs/plans/2026-07-08_email-template-english-numeric-code.md` | 将账户邮件模板改为英文，覆盖登录验证码、邮箱验证和密码重置；登录验证码和邮箱验证验证码改为 6 位纯数字，密码重置链接 token 保持现有长随机串。 |

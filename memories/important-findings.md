@@ -6,6 +6,18 @@
   依据来源：源码 `common/utils.go`、`controller/token.go`、`model/token.go`、`middleware/auth.go`、`web/default/src/features/keys/components/api-keys-provider.tsx`；CodeGraph 查询 `GenerateKey`、`AddToken`；OpenAI 官方文档仅公开 Bearer API key 使用方式，未公开生成算法。
   适用范围：后续维护用户 API key 生成、`sk-` 展示兼容、鉴权中间件、与 OpenAI API key 形态对齐判断。
 
+- 日期：2026-07-09
+  场景：XRTokenArkVideo 任务查询协议适配
+  发现内容：XRTokenArkVideo 的任务查询接口已改为 `GET /v1/videos/generations/{task_id}`；该查询返回的 `usage.completion_tokens` / `usage.total_tokens` 会写入 `relaycommon.TaskInfo`，任务完成结算可按 token 重算，Seedance native GET 响应也会保留 `usage`。
+  依据来源：源码 `relay/channel/task/xrtokenarkvideo/adaptor.go`、`controller/seedance_native.go`；测试 `TestFetchTaskUsesVideoGenerationsPath`、`TestParseTaskResultMapsUsageAndTopLevelVideoURL`、`TestSeedanceNativeTaskGetRendersXRTokenUsageAndNativeFields`；验证命令 `go test ./relay/channel/task/xrtokenarkvideo -count=1`、`go test ./controller -run 'SeedanceNative|XRToken' -count=1`、`go test ./service ./relay/channel/task/xrtokenarkvideo ./relay/channel/task/doubao ./relay -count=1`。
+  适用范围：后续维护 XRToken ARK video 渠道轮询、Seedance native 查询响应、视频任务 token 结算与使用日志。
+
+- 日期：2026-07-09
+  场景：Seedance native task 响应字段渲染
+  发现内容：Seedance native task 渲染层兼容顶层 `video_url` 与 `content.video_url`；XRToken 查询响应中的 `last_frame_url`、`framespersecond` 会在上游返回时保留；新增 `draft=false` 与 `priority=0` 按零值省略。返回 `id` 仍为 public task id，不暴露上游 task id。
+  依据来源：源码 `controller/seedance_native.go`；测试 `TestSeedanceNativeTaskGetRendersXRTokenUsageAndNativeFields`、`TestSeedanceNativeTaskGetReadsXRTokenTopLevelVideoURL`；验证命令 `go test ./controller -run 'SeedanceNative|XRToken' -count=1`、`go test ./controller -count=1`。
+  适用范围：后续维护 `/api/v3/contents/generations/tasks/{id}`、Seedance native list/get、XRToken 与 Doubao 存量任务数据兼容。
+
 - 日期：2026-07-08
   场景：修复 Seedance native 编译错误
   发现内容：`types.PriceData.OtherRatios` 已在 `fc1259f5 refactor(price): improve handling of other ratios in PriceData` 中由导出字段改为私有 `otherRatios` 加 `OtherRatios()` 快照方法；`controller/relay.go` 已同步改为方法调用，`controller/seedance_native.go` 漏改会导致 `go test ./controller` 和根包 `go build` 编译失败。修复后 Go 代码中不再存在 `PriceData.OtherRatios` 非方法调用。

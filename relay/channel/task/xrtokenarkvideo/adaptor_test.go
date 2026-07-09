@@ -30,13 +30,13 @@ func TestBuildRequestURLUsesV1TasksPath(t *testing.T) {
 	}
 }
 
-func TestFetchTaskUsesV1TasksPath(t *testing.T) {
+func TestFetchTaskUsesVideoGenerationsPath(t *testing.T) {
 	t.Parallel()
 
 	adaptor := &TaskAdaptor{}
 	_, err := adaptor.FetchTask("://bad-base", "sk-test", map[string]any{"task_id": "task_123"}, "")
-	if err == nil || !strings.Contains(err.Error(), `/v1/contents/generations/tasks/task_123`) {
-		t.Fatalf("FetchTask error = %v, want malformed URL containing XRToken /v1 task path", err)
+	if err == nil || !strings.Contains(err.Error(), `/v1/videos/generations/task_123`) {
+		t.Fatalf("FetchTask error = %v, want malformed URL containing XRToken video generation task path", err)
 	}
 }
 
@@ -156,13 +156,14 @@ func TestParseTaskResultAcceptsStringTimestamps(t *testing.T) {
 	}
 }
 
-func TestParseTaskResultReadsTopLevelVideoURL(t *testing.T) {
+func TestParseTaskResultMapsUsageAndTopLevelVideoURL(t *testing.T) {
 	t.Parallel()
 
 	taskInfo, err := (&TaskAdaptor{}).ParseTaskResult([]byte(`{
 		"id":"upstream_task_123",
 		"status":"succeeded",
 		"video_url":"https://cdn.example.com/video.mp4",
+		"usage":{"completion_tokens":108900,"total_tokens":108900},
 		"duration":5,
 		"created_at":1710000000,
 		"updated_at":1710000100
@@ -176,6 +177,32 @@ func TestParseTaskResultReadsTopLevelVideoURL(t *testing.T) {
 	}
 	if taskInfo.Url != "https://cdn.example.com/video.mp4" {
 		t.Fatalf("Url = %q, want top-level video_url", taskInfo.Url)
+	}
+	if taskInfo.CompletionTokens != 108900 || taskInfo.TotalTokens != 108900 {
+		t.Fatalf("usage tokens = %d/%d, want 108900/108900", taskInfo.CompletionTokens, taskInfo.TotalTokens)
+	}
+}
+
+func TestParseTaskResultReadsContentVideoURL(t *testing.T) {
+	t.Parallel()
+
+	taskInfo, err := (&TaskAdaptor{}).ParseTaskResult([]byte(`{
+		"id":"upstream_task_123",
+		"status":"succeeded",
+		"content":{"video_url":"https://cdn.example.com/content-video.mp4"},
+		"usage":{"completion_tokens":1000,"total_tokens":1000},
+		"created_at":1710000000,
+		"updated_at":1710000100
+	}`))
+	if err != nil {
+		t.Fatalf("ParseTaskResult returned error: %v", err)
+	}
+
+	if taskInfo.Status != model.TaskStatusSuccess {
+		t.Fatalf("Status = %q, want %q", taskInfo.Status, model.TaskStatusSuccess)
+	}
+	if taskInfo.Url != "https://cdn.example.com/content-video.mp4" {
+		t.Fatalf("Url = %q, want content.video_url fallback", taskInfo.Url)
 	}
 }
 
@@ -221,6 +248,42 @@ func TestConvertToOpenAIVideoReadsTopLevelVideoURL(t *testing.T) {
 	}
 	if video.CompletedAt != 1710000100 {
 		t.Fatalf("completed_at = %d, want upstream updated_at", video.CompletedAt)
+	}
+}
+
+func TestConvertToOpenAIVideoReadsContentVideoURL(t *testing.T) {
+	t.Parallel()
+
+	task := &model.Task{
+		TaskID:    "public_task_123",
+		Status:    model.TaskStatusSuccess,
+		Progress:  "100%",
+		CreatedAt: time.Unix(1700000000, 0).Unix(),
+		UpdatedAt: time.Unix(1700000100, 0).Unix(),
+		Properties: model.Properties{
+			OriginModelName: "doubao-seedance-2-0-260128",
+		},
+		Data: []byte(`{
+			"id":"upstream_task_123",
+			"status":"succeeded",
+			"content":{"video_url":"https://cdn.example.com/content-video.mp4"},
+			"duration":5,
+			"created_at":1710000000,
+			"updated_at":1710000100
+		}`),
+	}
+
+	body, err := (&TaskAdaptor{}).ConvertToOpenAIVideo(task)
+	if err != nil {
+		t.Fatalf("ConvertToOpenAIVideo returned error: %v", err)
+	}
+
+	var video dto.OpenAIVideo
+	if err := json.Unmarshal(body, &video); err != nil {
+		t.Fatalf("ConvertToOpenAIVideo returned invalid JSON: %v", err)
+	}
+	if video.Metadata["url"] != "https://cdn.example.com/content-video.mp4" {
+		t.Fatalf("metadata.url = %#v, want content.video_url", video.Metadata["url"])
 	}
 }
 
