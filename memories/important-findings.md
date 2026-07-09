@@ -1,5 +1,11 @@
 # Important Findings
 
+- 日期：2026-07-09
+  场景：比对 new-api 与 OpenAI API key 生成方式
+  发现内容：`new-api` 生成用户 API key 时调用 `common.GenerateKey()`，实际生成 48 位 `0-9a-zA-Z` 随机串并直接存入 `tokens.key`；`sk-` 不是入库生成内容，而是前端展示 / 复制时追加、服务端鉴权时剥离的兼容前缀。OpenAI 官方未公开其 API key 生成算法，因此不能证明二者算法一致。
+  依据来源：源码 `common/utils.go`、`controller/token.go`、`model/token.go`、`middleware/auth.go`、`web/default/src/features/keys/components/api-keys-provider.tsx`；CodeGraph 查询 `GenerateKey`、`AddToken`；OpenAI 官方文档仅公开 Bearer API key 使用方式，未公开生成算法。
+  适用范围：后续维护用户 API key 生成、`sk-` 展示兼容、鉴权中间件、与 OpenAI API key 形态对齐判断。
+
 - 日期：2026-07-08
   场景：修复 Seedance native 编译错误
   发现内容：`types.PriceData.OtherRatios` 已在 `fc1259f5 refactor(price): improve handling of other ratios in PriceData` 中由导出字段改为私有 `otherRatios` 加 `OtherRatios()` 快照方法；`controller/relay.go` 已同步改为方法调用，`controller/seedance_native.go` 漏改会导致 `go test ./controller` 和根包 `go build` 编译失败。修复后 Go 代码中不再存在 `PriceData.OtherRatios` 非方法调用。
@@ -53,3 +59,9 @@
   发现内容：当前本地 `new-api` 修复后 create/get/list 已通过，但 `https://testnapi.zz123.ai` 仍返回旧的 `service_tier` 上游拒绝错误；远端需部署本地修复后再复测成功。
   依据来源：本地 30169 HTTP 验证 create/get/list 返回 200；远端 2026-07-07 复测 `duration=1` 返回 400 `fail_to_fetch_task` 且消息仍指向 `service_tier`。
   适用范围：Seedance native API 发布验证与测试环境问题判断。
+
+- 日期：2026-07-09
+  场景：XRToken Ark Video Seedance 2.0 usage / Tokens 排查
+  发现内容：`xrtokenarkvideo` 上游任务查询响应结构只包含 `id/model/status/video_url/duration/created_at/updated_at/error`，不包含 `usage.completion_tokens` 或 `usage.total_tokens`；当前 `relay/channel/task/xrtokenarkvideo/adaptor.go` 的 `ParseTaskResult` 只映射状态和顶层 `video_url`，不会写入 `TaskInfo.CompletionTokens` / `TaskInfo.TotalTokens`。因此 Seedance native GET 由 `controller/seedance_native.go` 从 `Task.Data.usage` 渲染时会得到 0，使用日志 Tokens 列也因日志表 `prompt_tokens` / `completion_tokens` 均为 0 显示为空。
+  依据来源：用户提供的 xrtoken 查询响应结构；源码 `relay/channel/task/xrtokenarkvideo/adaptor.go`、`controller/seedance_native.go`、`service/task_polling.go`、`model/log.go`、`web/default/src/features/usage-logs/components/columns/common-logs-columns.tsx`；验证命令 `go test ./relay/channel/task/xrtokenarkvideo -run 'TestParseTaskResultReadsTopLevelVideoURL|TestDoResponseReturnsUpstreamTaskIDAndPublicVideoID' -count=1`、`go test ./controller -run 'TestSeedanceNativeTaskGetReadsXRTokenTopLevelVideoURL|TestBuildSeedanceNativeTaskResponseUsesPublicIDAndCanonicalData' -count=1`。
+  适用范围：XRToken Ark Video 渠道下 `doubao-seedance-2-0-260128`、`doubao-seedance-2-0-fast-260128` 的 native GET/list、异步任务计费重算和使用日志 Tokens 展示。
